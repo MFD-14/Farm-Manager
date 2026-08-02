@@ -85,7 +85,7 @@ export default function DayView({ onCountsChanged }) {
 function TaskCard({ inst, onOpen, done }) {
   const rolled = inst.missed_count > 0 && OPEN_STATES.has(inst.state);
   return (
-    <div className={`card ${done ? "done" : ""}`} onClick={onOpen}>
+    <div className={`card ${done ? "done" : ""}`} data-priority={inst.priority} onClick={onOpen}>
       <div className="row">
         <h3>{inst.title}</h3>
         <span className={`chip ${inst.priority}`}>{inst.priority}</span>

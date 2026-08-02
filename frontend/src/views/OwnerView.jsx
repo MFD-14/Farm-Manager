@@ -70,7 +70,7 @@ function Decisions() {
       <div className="daytitle">Decision queue</div>
       {items.length === 0 && <div className="empty">Queue is clear.</div>}
       {items.map((i) => (
-        <div className="card" key={i.id} onClick={() => {
+        <div className="card" key={i.id} data-priority={i.priority} onClick={() => {
           apiJson(`/api/instances/${i.id}`).then(setDetail);
         }}>
           <div className="row">
