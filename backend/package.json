@@ -1,0 +1,29 @@
+{
+  "name": "wfm-backend",
+  "version": "2.0.0",
+  "description": "Woodlands Farm Manager backend: append-only event log, task engine, evidence and verification layer (WFM-OPS-SPEC v1.0)",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "migrate": "node src/db/migrate.js",
+    "seed": "node src/db/seed.js",
+    "release": "node src/jobs/run-release.js",
+    "rebuild": "node src/jobs/rebuild-projections.js",
+    "test": "NODE_ENV=test node --test --test-concurrency=1 'test/**/*.test.js'"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "pg": "^8.12.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "uuid": "^9.0.1",
+    "node-cron": "^3.0.3",
+    "dotenv": "^16.4.5",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "morgan": "^1.10.0"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,104 @@
+// Sync surface (spec 6.2): one round trip both directions.
+import { Router } from "express";
+import { tx, q } from "../db/pool.js";
+import { auth } from "../middleware/auth.js";
+import { foldEvent } from "../engine/fold.js";
+import { evaluateRules } from "../engine/rules.js";
+import { farmDateStr } from "../util/time.js";
+
+export const syncRouter = Router();
+
+// POST /api/sync/events  — idempotent on event_uuid; duplicates are success.
+syncRouter.post("/events", auth(), async (req, res) => {
+  const { device_id, device_now, events = [] } = req.body || {};
+  if (!Array.isArray(events)) return res.status(400).json({ error: "events must be an array" });
+
+  const accepted = [];
+  const duplicates = [];
+  const rejected = [];
+
+  // Clock skew sample at handshake (spec 5.4).
+  if (device_id && device_now) {
+    const skewMs = Date.now() - new Date(device_now).getTime();
+    await q(`UPDATE devices SET clock_skew_ms = $2, last_sync_at = now() WHERE id = $1`, [device_id, skewMs]);
+  }
+
+  for (const e of events) {
+    if (!e.event_uuid) {
+      rejected.push({ event_uuid: null, reason: "missing event_uuid" });
+      continue;
+    }
+    try {
+      const result = await tx((c) =>
+        foldEvent(c, {
+          ...e,
+          actor_type: e.actor_type || (req.user.role === "owner" ? "owner" : "caretaker"),
+          actor_id: req.user.id,
+          device_id: device_id || req.user.deviceId,
+        }));
+      if (result.status === "accepted") accepted.push(e.event_uuid);
+      else if (result.status === "duplicate") duplicates.push(e.event_uuid);
+      else rejected.push({ event_uuid: e.event_uuid, reason: result.reason });
+    } catch (err) {
+      rejected.push({ event_uuid: e.event_uuid, reason: err.message });
+    }
+  }
+
+  // Event-sourced rules react promptly to caretaker data (T3, T4, T8).
+  if (accepted.length) {
+    try { await tx((c) => evaluateRules(c)); } catch { /* sweep also runs on cron */ }
+  }
+
+  // server_events since cursor: instance changes the phone should mirror.
+  const cursor = req.query.cursor || req.body?.cursor || null;
+  const serverEvents = await q(
+    `SELECT event_uuid, instance_id, actor_type, type, payload, server_time
+     FROM task_events
+     WHERE actor_type IN ('system','vim','owner') AND ($1::timestamptz IS NULL OR server_time > $1)
+     ORDER BY server_time LIMIT 500`,
+    [cursor]);
+
+  res.json({
+    accepted, duplicates, rejected,
+    server_events: serverEvents.rows,
+    cursor: serverEvents.rows.at(-1)?.server_time || cursor || new Date().toISOString(),
+  });
+});
+
+// GET /api/sync/bundle — the whole next-day pack in one cacheable response (R20).
+syncRouter.get("/bundle", auth(), async (req, res) => {
+  const dateStr = req.query.date || farmDateStr();
+  const plan = await q(`SELECT * FROM daily_plans WHERE plan_date = $1`, [dateStr]);
+  const planRow = plan.rows[0] || null;
+  const instances = planRow
+    ? (await q(
+        `SELECT ti.*, tt.instructions, tt.checklist, tt.evidence_policy AS template_evidence_policy
+         FROM task_instances ti JOIN task_templates tt ON tt.id = ti.template_id
+         WHERE ti.id = ANY($1)
+         ORDER BY array_position($1, ti.id)`, [planRow.instance_ids])).rows
+    : [];
+  // Open items outside today's plan (blocked, needs_review) still belong on the phone.
+  const openExtra = await q(
+    `SELECT ti.*, tt.instructions, tt.checklist, tt.evidence_policy AS template_evidence_policy
+     FROM task_instances ti JOIN task_templates tt ON tt.id = ti.template_id
+     WHERE ti.state IN ('released','acknowledged','in_progress','blocked','skip_pending','needs_review','done_reported')
+       AND (($1::uuid[]) IS NULL OR NOT (ti.id = ANY($1)))`,
+    [planRow?.instance_ids || null]);
+
+  const templates = await q(`SELECT * FROM task_templates WHERE active`);
+  const reference = {
+    assets: (await q(`SELECT id, code, name, kind, criticality FROM assets WHERE status = 'active'`)).rows,
+    locations: (await q(`SELECT id, code, name, kind, crop, plant_count FROM locations`)).rows,
+    batches: (await q(`SELECT id, name, placed_on, current_count, stage FROM batches`)).rows,
+    inventory: (await q(`SELECT id, name, unit, category, on_hand, reorder_point FROM inventory_items`)).rows,
+  };
+
+  res.json({
+    date: dateStr,
+    plan: planRow ? { ...planRow, instances } : null,
+    open_instances: openExtra.rows,
+    templates_delta: templates.rows,
+    reference_delta: reference,
+    cursor: new Date().toISOString(),
+  });
+});
