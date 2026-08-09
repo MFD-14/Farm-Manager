@@ -8,8 +8,22 @@ import { metaGet, metaSet } from "../lib/db.js";
 
 // Kwekwe long-term monthly norms (mm), from the farm climate calendar.
 const MONTH_NORMS = { 1: 170, 2: 160, 3: 100, 4: 30, 5: 5, 6: 2, 7: 1, 8: 2, 9: 10, 10: 40, 11: 100, 12: 160 };
-const SEASON_NORM_MM = 750;
+const SEASON_NORM_MM = Object.values(MONTH_NORMS).reduce((a, b) => a + b, 0); // 780
 const HEAVY_DAY_MM = 40; // today's drop fill scales against a heavy-rain day
+
+// Cumulative norm curve at month-of-season boundaries (season order Oct..Sep).
+const SEASON_MONTHS = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+const MONTH_DAYS = { 1: 31, 2: 28, 3: 31, 4: 30, 5: 31, 6: 30, 7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31 };
+const NORM_CURVE = (() => {
+  let d = 0, mm = 0;
+  const pts = [{ d: 0, mm: 0 }];
+  for (const m of SEASON_MONTHS) {
+    d += MONTH_DAYS[m];
+    mm += MONTH_NORMS[m];
+    pts.push({ d, mm });
+  }
+  return pts;
+})();
 
 export default function RainView({ onCaptureToday }) {
   const [data, setData] = useState(null);
@@ -112,6 +126,7 @@ export default function RainView({ onCaptureToday }) {
       )}
 
       <div className="section-title">Season · from {fmtDate(data.season.start)}</div>
+      {data.seasons?.length > 0 && <SeasonChart seasons={data.seasons} />}
       <div className="card">
         <div className="kv"><span>Season to date</span><b>{fmt(data.season.total_mm)} mm</b></div>
         <div className="rain-season-track">
@@ -158,6 +173,91 @@ function BarCard({ items, emptyText, showNorm = false }) {
       </div>
     </div>
   );
+}
+
+// Cumulative curves: this season (solid blue), last season (solid earth), and
+// the climate norm (dashed grey), on a shared day-of-season axis Oct..Sep.
+function SeasonChart({ seasons }) {
+  const W = 340, H = 168, PAD_L = 34, PAD_B = 22, PAD_T = 10;
+  const plotW = W - PAD_L - 6, plotH = H - PAD_T - PAD_B;
+  const maxMm = Math.max(
+    SEASON_NORM_MM,
+    ...seasons.map((s) => s.total_mm),
+  ) * 1.05;
+  const x = (d) => PAD_L + (Math.min(d, 366) / 366) * plotW;
+  const y = (mm) => PAD_T + plotH - (mm / maxMm) * plotH;
+  const path = (pts) => pts.length
+    ? `M ${x(0)} ${y(0)} ` + pts.map((p) => `L ${x(p.d)} ${y(p.mm)}`).join(" ")
+    : "";
+
+  const current = seasons.find((s) => s.current);
+  const previous = seasons.find((s) => !s.current);
+  const currentEnd = current?.points.at(-1);
+
+  const gridLines = [200, 400, 600, 800].filter((g) => g < maxMm);
+  const monthTicks = SEASON_MONTHS.map((m, i) => ({
+    label: "ONDJFMAMJJAS"[i],
+    d: SEASON_MONTHS.slice(0, i).reduce((a, mo) => a + MONTH_DAYS[mo], 0),
+  }));
+
+  return (
+    <div className="card rain-cmp">
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", display: "block" }}>
+        {gridLines.map((g) => (
+          <g key={g}>
+            <line x1={PAD_L} y1={y(g)} x2={W - 6} y2={y(g)} stroke="var(--bl)" strokeWidth="1" />
+            <text x={PAD_L - 5} y={y(g) + 3} textAnchor="end" fontSize="8.5" fill="var(--tm)">{g}</text>
+          </g>
+        ))}
+        {monthTicks.map((t) => (
+          <text key={t.d} x={x(t.d + 15)} y={H - 8} textAnchor="middle" fontSize="8.5" fill="var(--tm)">{t.label}</text>
+        ))}
+        <line x1={PAD_L} y1={y(0)} x2={W - 6} y2={y(0)} stroke="var(--bd)" strokeWidth="1" />
+
+        <path d={path(NORM_CURVE)} fill="none" stroke="var(--tm)" strokeWidth="1.5"
+          strokeDasharray="4 4" opacity=".7" />
+        {previous && (
+          <path d={path(previous.points)} fill="none" stroke="#a07c4f" strokeWidth="2.2"
+            strokeLinejoin="round" opacity=".85" />
+        )}
+        {current && (
+          <path d={path(current.points)} fill="none" stroke="var(--b5)" strokeWidth="2.8"
+            strokeLinejoin="round" />
+        )}
+        {currentEnd && (
+          <g>
+            <circle cx={x(currentEnd.d)} cy={y(currentEnd.mm)} r="4" fill="var(--b5)"
+              stroke="#fff" strokeWidth="1.5" />
+            <text x={Math.min(x(currentEnd.d) + 6, W - 40)} y={y(currentEnd.mm) - 7}
+              fontSize="9.5" fontWeight="700" fill="#1b5e8a">{fmt(currentEnd.mm)}</text>
+          </g>
+        )}
+      </svg>
+      <div className="rain-legend" style={{ paddingTop: 4 }}>
+        {current && <span><i className="sw line-cur" /> {current.label}</span>}
+        {previous && <span><i className="sw line-prev" /> {previous.label}</span>}
+        <span><i className="sw line-norm" /> norm</span>
+      </div>
+      {previous && current && (
+        <p className="evidence-note" style={{ textAlign: "left", padding: "0 2px 4px" }}>
+          {seasonVerdict(current, previous)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Compare like with like: last season's cumulative total at the same
+// day-of-season as this season's latest reading.
+function seasonVerdict(current, previous) {
+  const day = current.points.at(-1)?.d ?? 0;
+  const prevAtSameDay = [...previous.points].reverse().find((p) => p.d <= day)?.mm ?? 0;
+  const nowMm = current.total_mm;
+  const diff = Math.round((nowMm - prevAtSameDay) * 10) / 10;
+  if (Math.abs(diff) < 10) return `Tracking last season almost exactly at this point (${fmt(prevAtSameDay)} mm by the same day).`;
+  return diff > 0
+    ? `${fmt(diff)} mm ahead of last season at this point (${fmt(prevAtSameDay)} mm by the same day).`
+    : `${fmt(-diff)} mm behind last season at this point (${fmt(prevAtSameDay)} mm by the same day).`;
 }
 
 function WeeklySummary({ weeks }) {

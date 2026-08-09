@@ -118,12 +118,42 @@ ownerRouter.get("/rain", auth(), async (req, res) => {
        AND taken_at >= date_trunc('month', now() AT TIME ZONE 'Africa/Harare') - interval '11 months'
      GROUP BY 1 ORDER BY 1`);
 
+  // Season-vs-season comparison: cumulative curves for the current and previous
+  // rain years, as day-of-season points (0 = 1 October).
+  const seasonCurve = async (startYear) => {
+    const start = `${startYear}-10-01`;
+    const end = `${startYear + 1}-10-01`;
+    const rows = await q(
+      `SELECT to_char(date_trunc('day', taken_at AT TIME ZONE 'Africa/Harare'), 'YYYY-MM-DD') AS d,
+              SUM(value) AS mm
+       FROM readings WHERE metric = 'rain_mm' AND taken_at >= $1::date AND taken_at < $2::date
+       GROUP BY 1 ORDER BY 1`, [start, end]);
+    let cum = 0;
+    const startMs = new Date(start + "T00:00:00Z").getTime();
+    const points = rows.rows.map((r) => {
+      cum += Number(r.mm);
+      return {
+        d: Math.round((new Date(r.d + "T00:00:00Z").getTime() - startMs) / 86_400_000),
+        mm: Math.round(cum * 10) / 10,
+      };
+    });
+    return {
+      label: `${startYear}/${String(startYear + 1).slice(2)}`,
+      start, points, total_mm: Math.round(cum * 10) / 10,
+    };
+  };
+  const currentCurve = { ...(await seasonCurve(seasonStartYear)), current: true };
+  const previousCurve = await seasonCurve(seasonStartYear - 1);
+  const seasons = [currentCurve];
+  if (previousCurve.points.length) seasons.push(previousCurve);
+
   res.json({
     today_mm: Number(today.rows[0].mm),
     last_reading: last.rows[0] ? { mm: Number(last.rows[0].value), at: last.rows[0].taken_at } : null,
     days: daily.rows.map((r) => ({ date: r.d, mm: Number(r.mm) })),
     weeks: weekly.rows.map((r) => ({ week_start: r.wk, mm: Number(r.mm), rain_days: Number(r.rain_days) })),
     months: monthly.rows.map((r) => ({ month: r.m, mm: Number(r.mm), rain_days: Number(r.rain_days) })),
+    seasons,
     season: {
       start: seasonStart,
       total_mm: Number(season.rows[0].mm),

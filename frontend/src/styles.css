@@ -228,6 +228,10 @@ button { font-family:var(--fb); cursor:pointer; }
   vertical-align:-1px; margin-right:6px; }
 .rain-legend .sw.actual { background:linear-gradient(180deg, #5db9ec 0%, var(--b5) 100%); }
 .rain-legend .sw.norm { border:1.5px dashed rgba(41,128,185,.55); background:none; }
+.rain-legend .sw.line-cur { height:3px; border-radius:2px; background:var(--b5); }
+.rain-legend .sw.line-prev { height:3px; border-radius:2px; background:#a07c4f; }
+.rain-legend .sw.line-norm { height:0; border-top:2px dashed var(--tm); background:none; }
+.rain-cmp { margin-bottom:10px; padding:14px 12px 8px; }
 
 .rain-season-track { position:relative; height:14px; border-radius:8px; background:var(--bl);
   margin:10px 0 12px; overflow:hidden; }

@@ -104,3 +104,29 @@ test("rain endpoint aggregates weekly and monthly totals", async () => {
   assert.equal(thisMonth.mm, 15);
   assert.equal(thisMonth.rain_days, 2);
 });
+
+test("rain endpoint returns cumulative season-vs-season curves", async () => {
+  // Current season (2025/26 at the frozen test horizon) and previous season.
+  await q(`INSERT INTO readings (metric, value, taken_at) VALUES
+     ('rain_mm', 10, now()),
+     ('rain_mm', 25, now() - interval '30 days'),
+     ('rain_mm', 40, now() - interval '1 year'),
+     ('rain_mm', 20, now() - interval '1 year' + interval '10 days')`);
+  const r = await fetch(base + "/api/owner/rain", {
+    headers: { Authorization: `Bearer ${ownerToken}` } }).then((x) => x.json());
+  assert.equal(r.seasons.length, 2, "current and previous season present");
+  const cur = r.seasons.find((s) => s.current);
+  const prev = r.seasons.find((s) => !s.current);
+  assert.equal(cur.total_mm, 35);
+  assert.equal(prev.total_mm, 60);
+  // Cumulative and monotonic
+  const cums = cur.points.map((p) => p.mm);
+  assert.deepEqual(cums, [...cums].sort((a, b) => a - b));
+  assert.equal(cums.at(-1), 35);
+  // Day-of-season indexes are in range and ordered
+  const ds = cur.points.map((p) => p.d);
+  assert.ok(ds.every((d) => d >= 0 && d <= 366));
+  assert.deepEqual(ds, [...ds].sort((a, b) => a - b));
+  // Labels look like 2025/26
+  assert.match(cur.label, /^\d{4}\/\d{2}$/);
+});
