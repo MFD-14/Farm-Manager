@@ -127,7 +127,12 @@ export async function seed({ withUsers = true } = {}) {
          ('absence_mode', '{"active": false}'),
          ('water_params', '{"tank_usable": 80000, "pool_volume": 45000, "borehole_lph": 6000}'),
          ('irrigation_demand', '{"BLK-A": {"litres_per_plant": 1.2, "emitter_lph": 2.0},
-                                 "BLK-B": {"litres_per_day": 7000}}')
+                                 "BLK-B": {"litres_per_day": 7000}}'),
+         ('water_balance', '{"enabled": false,
+            "blocks": {
+              "BLK-A": {"kc": 1.0, "taw_mm": 60, "mad": 0.45, "area_m2": 2700, "rate_mm_h": 7.4, "efficiency": 0.9},
+              "BLK-B": {"kc": 1.1, "taw_mm": 90, "mad": 0.5, "area_m2": 2250, "rate_mm_h": 5.0, "efficiency": 0.9}
+            }}')
        ON CONFLICT (key) DO NOTHING`);
   });
   console.log("seeded");

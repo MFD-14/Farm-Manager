@@ -5,6 +5,7 @@ import { startSyncLoop, onSyncState, pullBundle } from "./lib/sync.js";
 import DayView from "./views/DayView.jsx";
 import OwnerView from "./views/OwnerView.jsx";
 import RainView from "./views/RainView.jsx";
+import WaterView from "./views/WaterView.jsx";
 import Login from "./views/Login.jsx";
 
 function TabIcon({ d }) {
@@ -84,7 +85,7 @@ export default function App() {
         </div>
       </header>
       {isOwner
-        ? (tab === "rain" ? <RainView /> : <OwnerView tab={tab} />)
+        ? (tab === "rain" ? <RainView /> : tab === "water" ? <WaterView /> : <OwnerView tab={tab} />)
         : (tab === "rain"
             ? <RainView onCaptureToday={() => setTab("day")} />
             : <DayView onCountsChanged={refreshCounts} />)}
@@ -98,6 +99,9 @@ export default function App() {
           </button>
           <button className={tab === "rain" ? "on" : ""} onClick={() => setTab("rain")}>
             <TabIcon d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z" />Rain
+          </button>
+          <button className={tab === "water" ? "on" : ""} onClick={() => setTab("water")}>
+            <TabIcon d="M2 12h4l3-9 4 18 3-9h6" />Water
           </button>
           <button className={tab === "kpis" ? "on" : ""} onClick={() => setTab("kpis")}>
             <TabIcon d="M12 20V10M18 20V4M6 20v-4" />KPIs

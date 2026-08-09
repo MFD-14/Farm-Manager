@@ -67,6 +67,19 @@ forecast; a stale snapshot (> 36 h) is ignored and the gauge path never depends
 on the network. The rain page shows the 7-day strip with T2 flags and the
 digest carries "rain expected tomorrow".
 
+**Phase 2 water-balance planner (spec §3.5 / R14).** The FAO-56 checkbook:
+per-block daily ledger `deficit = deficit + Kc·ET0 − rain − irrigation`,
+clamped to the root-zone TAW, recomputed deterministically from readings (ET0
+from the forecast feed, rain from the W-08 gauge, applied volumes from
+completed W-03 shifts). When the projected deficit crosses management-allowed
+depletion the planner emits a refill shift with run time = depth / (rate ×
+efficiency), capped at 180 minutes with the remainder carrying forward. Ships
+disabled ("log before you automate"): the owner Water tab shows the ledger
+running in shadow next to the Phase 1 tank-budget shifts and flips Phase 2 on
+with one tap; caretaker shift cards then explain the deficit they replace.
+Per-block agronomy (Kc, TAW, MAD, area, emitter rate, efficiency) is owner
+configuration, and days that fell back to climate-normal ET0 are flagged.
+
 **Channels (spec §4.4, §1.7).** WhatsApp webhook (idempotent on message id,
 allow-listed numbers, 24-hour window tracking, button replies appended as
 events, inbound media fetched and attached, ambiguous media prompting a task

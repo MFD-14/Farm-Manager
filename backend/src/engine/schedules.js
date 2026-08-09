@@ -71,6 +71,15 @@ export function meterDue(schedule, accumulatorTotal, lastServiceAtTotal) {
 // shifts: block, start window, duration minutes, expected litres. Demand comes
 // from the real stand (locations.plant_count maintained by anchors).
 export async function irrigationPlan(c, dateStr) {
+  // Dispatch: Phase 2 water balance when enabled (spec 3.5 Phase 2 / R14),
+  // else the Phase 1 tank-budget method below.
+  const { getWbConfig, waterBalancePlan } = await import("./waterBalance.js");
+  const wb = await getWbConfig(c);
+  if (wb.enabled) return waterBalancePlan(c, dateStr);
+  return tankBudgetPlan(c, dateStr);
+}
+
+export async function tankBudgetPlan(c, dateStr) {
   const { rows: blocks } = await c.query(
     `SELECT id, code, name, crop, plant_count FROM locations WHERE kind = 'block' AND irrigated`);
   const demand = await c.query(`SELECT value FROM farm_settings WHERE key = 'irrigation_demand'`);

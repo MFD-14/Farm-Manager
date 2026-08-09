@@ -208,7 +208,8 @@ export async function runRelease(c, dateStr, { now = new Date() } = {}) {
           subjectType: "location", subjectId: shift.block_id, assignee,
           title: `Irrigation shift: ${shift.block_name}`,
           periodSuffix: `:${shift.block_code}`,
-          params: { block: shift.block_code, minutes: shift.minutes, litres: shift.litres, start: shift.start },
+          params: { block: shift.block_code, minutes: shift.minutes, litres: shift.litres,
+                    start: shift.start, ...(shift.basis ? { basis: shift.basis } : {}) },
         });
         if (!inserted) { planIds.push(id); continue; }
         // Rain-suppressed shifts die rather than rot (spec R5/T2): expire at end of day.

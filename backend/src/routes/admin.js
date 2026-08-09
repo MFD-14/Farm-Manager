@@ -193,6 +193,39 @@ ownerRouter.post("/forecast/refresh", auth(), requireRole("owner", "admin"), asy
   res.status(result.ok ? 200 : 502).json(result);
 });
 
+// Phase 2 water-balance ledger (spec 3.5): per-block deficit, MAD threshold,
+// trailing ledger rows and today's plan basis.
+ownerRouter.get("/water", auth(), async (req, res) => {
+  const { getWbConfig, computeLedger, waterBalancePlan } = await import("../engine/waterBalance.js");
+  const result = await tx(async (c) => {
+    const cfg = await getWbConfig(c);
+    const dateStr = req.query.date || farmDateStr();
+    const blocks = [];
+    for (const code of Object.keys(cfg.blocks)) {
+      const ledger = await computeLedger(c, code, dateStr, { days: 14 });
+      if (ledger) blocks.push(ledger);
+    }
+    const plan = cfg.enabled ? await waterBalancePlan(c, dateStr) : [];
+    return { enabled: cfg.enabled, date: dateStr, blocks, plan };
+  });
+  res.json(result);
+});
+
+ownerRouter.post("/water/config", auth(), requireRole("owner", "admin"), async (req, res) => {
+  const { getWbConfig } = await import("../engine/waterBalance.js");
+  const current = await tx((c) => getWbConfig(c));
+  const next = {
+    ...current,
+    ...(req.body?.enabled !== undefined ? { enabled: !!req.body.enabled } : {}),
+    blocks: { ...current.blocks, ...(req.body?.blocks || {}) },
+  };
+  await q(
+    `INSERT INTO farm_settings (key, value) VALUES ('water_balance', $1)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+    [JSON.stringify(next)]);
+  res.json(next);
+});
+
 // Devices (spec 6.2, 6.3): register, restore, revoke.
 devicesRouter.post("/register", auth(), async (req, res) => {
   const { platform = "android", push_token = null } = req.body || {};

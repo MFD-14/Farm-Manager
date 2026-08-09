@@ -71,6 +71,13 @@ export default function CaptureSheet({ instance, onClose }) {
           {instance.params?.litres ? ` · ${instance.params.minutes} min · ${instance.params.litres} L` : ""}
         </div>
 
+        {instance.params?.basis?.method === "water_balance" && (
+          <div className="instructions">
+            Replacing {instance.params.basis.replacing_mm} mm of a {instance.params.basis.deficit_mm} mm
+            soil-water deficit (computed from ET and rain).
+          </div>
+        )}
+
         {instance.retake_reason && <div className="retake">Retake asked: {instance.retake_reason}</div>}
 
         {(instance.instructions || []).length > 0 && (

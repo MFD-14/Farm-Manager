@@ -46,6 +46,19 @@ export async function fetchForecast(c) {
     `INSERT INTO farm_settings (key, value) VALUES ('forecast', $1)
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
     [JSON.stringify(snapshot)]);
+
+  // Project today's reference ET0 into readings so the water-balance ledger
+  // (spec 3.5 Phase 2) accumulates real values day by day, one row per day.
+  const today = daily[0];
+  if (today?.et0_mm != null && !Number.isNaN(today.et0_mm)) {
+    await c.query(
+      `INSERT INTO readings (metric, value, unit, taken_at)
+       SELECT 'et0_mm', $1, 'mm', now()
+       WHERE NOT EXISTS (
+         SELECT 1 FROM readings WHERE metric = 'et0_mm'
+           AND date_trunc('day', taken_at AT TIME ZONE 'Africa/Harare') = $2::date)`,
+      [today.et0_mm, today.date]);
+  }
   return { ok: true, days: daily.length };
 }
 

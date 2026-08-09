@@ -245,6 +245,28 @@ button { font-family:var(--fb); cursor:pointer; }
 .fc-day .fflag { position:absolute; top:2px; right:2px; font-size:8px; font-weight:800;
   background:var(--b5); color:#fff; padding:1px 4px; border-radius:6px; }
 
+/* ── Water balance ───────────────────────────────────────── */
+.wb-status { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.wb-gauge { margin:10px 0 4px; }
+.wb-gauge .track { position:relative; height:16px; border-radius:9px; background:var(--g1);
+  overflow:visible; }
+.wb-gauge .fill { height:100%; border-radius:9px;
+  background:linear-gradient(90deg, #5db9ec 0%, var(--b5) 100%); transition:width .4s ease; }
+.wb-gauge .fill.over { background:linear-gradient(90deg, var(--gold) 0%, var(--r4) 100%); }
+.wb-gauge .mad { position:absolute; top:-4px; bottom:-4px; width:3px; border-radius:2px;
+  background:var(--gold); box-shadow:0 0 0 1.5px rgba(255,255,255,.8); }
+.wb-gauge-labels { display:flex; justify-content:space-between; font-size:11px;
+  color:var(--tm); margin-top:5px; }
+.wb-gauge-labels b { color:var(--e8); font-size:12.5px; }
+.wb-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:4px;
+  font-variant-numeric:tabular-nums; }
+.wb-table th { text-align:right; font-size:9.5px; text-transform:uppercase; letter-spacing:.6px;
+  color:var(--tm); padding:4px 6px; border-bottom:1.5px solid var(--bd); }
+.wb-table th:first-child, .wb-table td:first-child { text-align:left; }
+.wb-table td { text-align:right; padding:5px 6px; border-bottom:1px solid var(--bl);
+  color:var(--ts); }
+.wb-table tr:last-child td { border-bottom:none; }
+
 .rain-season-track { position:relative; height:14px; border-radius:8px; background:var(--bl);
   margin:10px 0 12px; overflow:hidden; }
 .rain-season-track .fill { height:100%; border-radius:8px;
