@@ -1,19 +1,20 @@
-// Rainfall screen, raindrop-app style: a big drop that fills with today's rain,
-// 14-day bars, season-to-date accumulation against the Kwekwe seasonal norm.
-// Data caches in IndexedDB so the screen still renders in a dead zone; the
-// reading itself is captured through the daily W-08 task like everything else.
+// Rainfall screen, raindrop-app style, with Daily / Weekly / Monthly views.
+// Monthly bars are drawn against the Kwekwe climate-calendar norms so a failing
+// rain year is visible at a glance. Data caches in IndexedDB for offline
+// viewing; the reading itself is captured through the daily W-08 task.
 import React, { useEffect, useState } from "react";
 import { apiJson } from "../lib/api.js";
 import { metaGet, metaSet } from "../lib/db.js";
 
-// Kwekwe long-term seasonal norm (spec climate table sums to ~770 mm/season).
+// Kwekwe long-term monthly norms (mm), from the farm climate calendar.
+const MONTH_NORMS = { 1: 170, 2: 160, 3: 100, 4: 30, 5: 5, 6: 2, 7: 1, 8: 2, 9: 10, 10: 40, 11: 100, 12: 160 };
 const SEASON_NORM_MM = 750;
-// Today's drop fill scales against a heavy-rain day.
-const HEAVY_DAY_MM = 40;
+const HEAVY_DAY_MM = 40; // today's drop fill scales against a heavy-rain day
 
 export default function RainView({ onCaptureToday }) {
   const [data, setData] = useState(null);
   const [stale, setStale] = useState(false);
+  const [mode, setMode] = useState("daily"); // daily | weekly | monthly
 
   useEffect(() => {
     (async () => {
@@ -31,7 +32,6 @@ export default function RainView({ onCaptureToday }) {
 
   const fill = Math.max(0, Math.min(1, data.today_mm / HEAVY_DAY_MM));
   const seasonPct = Math.min(100, Math.round((data.season.total_mm / SEASON_NORM_MM) * 100));
-  const maxDay = Math.max(1, ...data.days.map((d) => d.mm));
 
   return (
     <div className="wrap">
@@ -58,20 +58,58 @@ export default function RainView({ onCaptureToday }) {
         </div>
       </div>
 
-      <div className="section-title">Last 14 days</div>
-      <div className="card">
-        <div className="rain-bars">
-          {data.days.length === 0 && <div className="empty" style={{ padding: 18 }}>No readings in this window.</div>}
-          {data.days.map((d) => (
-            <div className="rain-bar" key={d.date} title={`${d.date}: ${fmt(d.mm)} mm`}>
-              <span className="v">{d.mm > 0 ? fmt(d.mm) : ""}</span>
-              <div className="bar" style={{ height: `${Math.max(d.mm > 0 ? 8 : 3, (d.mm / maxDay) * 92)}px` }}
-                data-dry={d.mm === 0} />
-              <span className="d">{d.date.slice(8)}</span>
-            </div>
-          ))}
-        </div>
+      <div className="rain-seg">
+        {[["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"]].map(([k, label]) => (
+          <button key={k} className={mode === k ? "on" : ""} onClick={() => setMode(k)}>{label}</button>
+        ))}
       </div>
+
+      {mode === "daily" && (
+        <>
+          <div className="section-title">Last 14 days</div>
+          <BarCard
+            items={data.days.map((d) => ({ key: d.date, mm: d.mm, label: d.date.slice(8) }))}
+            emptyText="No readings in this window."
+          />
+        </>
+      )}
+
+      {mode === "weekly" && (
+        <>
+          <div className="section-title">Last 12 weeks · totals</div>
+          <BarCard
+            items={data.weeks.map((w) => ({
+              key: w.week_start, mm: w.mm,
+              label: wkLabel(w.week_start),
+              sub: w.rain_days ? `${w.rain_days}d` : "",
+            }))}
+            emptyText="No readings in the last 12 weeks."
+          />
+          <WeeklySummary weeks={data.weeks} />
+        </>
+      )}
+
+      {mode === "monthly" && (
+        <>
+          <div className="section-title">Last 12 months · against Kwekwe norm</div>
+          <BarCard
+            items={data.months.map((m) => {
+              const monthNum = Number(m.month.slice(5, 7));
+              return {
+                key: m.month, mm: m.mm, label: moLabel(m.month),
+                norm: MONTH_NORMS[monthNum],
+                sub: m.rain_days ? `${m.rain_days}d` : "",
+              };
+            })}
+            emptyText="No readings in the last 12 months."
+            showNorm
+          />
+          <div className="card rain-legend">
+            <span><i className="sw actual" /> recorded</span>
+            <span><i className="sw norm" /> monthly norm</span>
+          </div>
+        </>
+      )}
 
       <div className="section-title">Season · from {fmtDate(data.season.start)}</div>
       <div className="card">
@@ -94,9 +132,50 @@ export default function RainView({ onCaptureToday }) {
   );
 }
 
+// Shared bar chart. With showNorm, a ghost bar behind each actual bar marks the
+// monthly norm, scaled on the same axis.
+function BarCard({ items, emptyText, showNorm = false }) {
+  const max = Math.max(1, ...items.map((i) => Math.max(i.mm, showNorm ? i.norm || 0 : 0)));
+  const H = 96;
+  return (
+    <div className="card">
+      <div className="rain-bars" style={{ minHeight: H + 44 }}>
+        {items.length === 0 && <div className="empty" style={{ padding: 18 }}>{emptyText}</div>}
+        {items.map((i) => (
+          <div className="rain-bar" key={i.key} title={`${i.key}: ${fmt(i.mm)} mm`}>
+            <span className="v">{i.mm > 0 ? fmt(i.mm) : ""}</span>
+            <div className="stack" style={{ height: H }}>
+              {showNorm && i.norm !== undefined && (
+                <div className="bar ghost" style={{ height: `${Math.max(2, (i.norm / max) * H)}px` }} />
+              )}
+              <div className="bar" data-dry={i.mm === 0}
+                style={{ height: `${Math.max(i.mm > 0 ? 8 : 3, (i.mm / max) * H)}px` }} />
+            </div>
+            <span className="d">{i.label}</span>
+            {i.sub ? <span className="d sub">{i.sub}</span> : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WeeklySummary({ weeks }) {
+  if (!weeks.length) return null;
+  const total = weeks.reduce((a, w) => a + w.mm, 0);
+  const best = weeks.reduce((a, w) => (w.mm > a.mm ? w : a), weeks[0]);
+  const thisWeek = weeks[weeks.length - 1];
+  return (
+    <div className="card">
+      <div className="kv"><span>This week</span><b>{fmt(thisWeek.mm)} mm · {thisWeek.rain_days} rain day{thisWeek.rain_days === 1 ? "" : "s"}</b></div>
+      <div className="kv"><span>12-week total</span><b>{fmt(total)} mm</b></div>
+      <div className="kv"><span>Wettest week</span><b>{fmt(best.mm)} mm · wk of {wkLabel(best.week_start)}</b></div>
+    </div>
+  );
+}
+
 function Drop({ fill }) {
-  // Teardrop with a clipped water level that rises with today's rainfall.
-  const level = 118 - fill * 92; // y of water surface inside the drop (26..118)
+  const level = 118 - fill * 92;
   return (
     <svg className="rain-drop" viewBox="0 0 100 130" width="108" height="140">
       <defs>
@@ -125,3 +204,5 @@ function Drop({ fill }) {
 
 const fmt = (n) => (Math.round(n * 10) / 10).toString();
 const fmtDate = (d) => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const wkLabel = (d) => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const moLabel = (m) => new Date(m + "-15T12:00:00Z").toLocaleDateString("en-GB", { month: "short" });

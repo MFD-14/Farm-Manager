@@ -201,16 +201,33 @@ button { font-family:var(--fb); cursor:pointer; }
   letter-spacing:1.2px; color:var(--b5); margin-top:3px; }
 .rain-today .last { font-size:12px; color:var(--tm); margin-top:7px; }
 
+.rain-seg { display:flex; background:var(--sf); border:1.5px solid var(--bd); border-radius:12px;
+  padding:3px; gap:3px; margin:14px 0 2px; box-shadow:var(--ss); }
+.rain-seg button { flex:1; border:none; background:none; padding:9px 4px; border-radius:9px;
+  font-size:13px; font-weight:700; color:var(--tm); transition:all .15s ease; }
+.rain-seg button.on { background:var(--b5); color:#fff; box-shadow:0 2px 6px rgba(41,128,185,.3); }
+
 .rain-bars { display:flex; align-items:flex-end; gap:5px; padding:6px 2px 0;
   min-height:132px; overflow-x:auto; }
 .rain-bar { flex:1; min-width:18px; display:flex; flex-direction:column; align-items:center;
   justify-content:flex-end; gap:4px; }
+.rain-bar .stack { position:relative; width:100%; max-width:26px; display:flex;
+  align-items:flex-end; justify-content:center; }
 .rain-bar .bar { width:100%; max-width:26px; border-radius:6px 6px 3px 3px;
   background:linear-gradient(180deg, #5db9ec 0%, var(--b5) 100%);
   box-shadow:0 1px 3px rgba(41,128,185,.3); transition:height .3s ease; }
 .rain-bar .bar[data-dry="true"] { background:var(--bl); box-shadow:none; }
+.rain-bar .bar.ghost { position:absolute; left:0; right:0; bottom:0; width:100%;
+  background:none; border:1.5px dashed rgba(41,128,185,.45); border-bottom:none;
+  border-radius:6px 6px 0 0; box-shadow:none; }
 .rain-bar .v { font-size:10px; font-weight:700; color:#1b5e8a; font-variant-numeric:tabular-nums; }
 .rain-bar .d { font-size:10px; color:var(--tm); }
+.rain-bar .d.sub { font-size:9px; opacity:.75; margin-top:-3px; }
+.rain-legend { display:flex; gap:18px; padding:10px 14px; font-size:12px; color:var(--ts); }
+.rain-legend .sw { display:inline-block; width:14px; height:10px; border-radius:3px;
+  vertical-align:-1px; margin-right:6px; }
+.rain-legend .sw.actual { background:linear-gradient(180deg, #5db9ec 0%, var(--b5) 100%); }
+.rain-legend .sw.norm { border:1.5px dashed rgba(41,128,185,.55); background:none; }
 
 .rain-season-track { position:relative; height:14px; border-radius:8px; background:var(--bl);
   margin:10px 0 12px; overflow:hidden; }

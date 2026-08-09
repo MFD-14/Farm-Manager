@@ -87,3 +87,20 @@ test("GET /api/owner/rain returns today, daily series and season accumulation", 
   assert.equal(r.season.wettest_day.mm, 31);
   assert.ok(r.season.start.endsWith("-10-01"));
 });
+
+test("rain endpoint aggregates weekly and monthly totals", async () => {
+  await q(`INSERT INTO readings (metric, value, taken_at) VALUES
+     ('rain_mm', 10, now()),
+     ('rain_mm', 5, now() - interval '1 day'),
+     ('rain_mm', 20, now() - interval '35 days'),
+     ('rain_mm', 7, now() - interval '65 days')`);
+  const r = await fetch(base + "/api/owner/rain", {
+    headers: { Authorization: `Bearer ${ownerToken}` } }).then((x) => x.json());
+  assert.ok(Array.isArray(r.weeks) && r.weeks.length >= 2, "weekly series present");
+  assert.ok(Array.isArray(r.months) && r.months.length >= 3, "monthly series present");
+  const monthSum = r.months.reduce((a, m) => a + m.mm, 0);
+  assert.equal(monthSum, 42, "monthly totals cover all readings");
+  const thisMonth = r.months.at(-1);
+  assert.equal(thisMonth.mm, 15);
+  assert.equal(thisMonth.rain_days, 2);
+});

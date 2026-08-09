@@ -101,10 +101,29 @@ ownerRouter.get("/rain", auth(), async (req, res) => {
      FROM readings WHERE metric = 'rain_mm' AND taken_at >= $1::date
      GROUP BY 1 ORDER BY 2 DESC LIMIT 1`, [seasonStart]);
 
+  // Weekly totals (last 12 ISO weeks) and monthly totals (last 12 months) for
+  // the week/month views of the rain page.
+  const weekly = await q(
+    `SELECT to_char(date_trunc('week', taken_at AT TIME ZONE 'Africa/Harare'), 'YYYY-MM-DD') AS wk,
+            SUM(value) AS mm,
+            COUNT(DISTINCT date_trunc('day', taken_at)) FILTER (WHERE value > 0) AS rain_days
+     FROM readings WHERE metric = 'rain_mm'
+       AND taken_at >= date_trunc('week', now() AT TIME ZONE 'Africa/Harare') - interval '11 weeks'
+     GROUP BY 1 ORDER BY 1`);
+  const monthly = await q(
+    `SELECT to_char(date_trunc('month', taken_at AT TIME ZONE 'Africa/Harare'), 'YYYY-MM') AS m,
+            SUM(value) AS mm,
+            COUNT(DISTINCT date_trunc('day', taken_at)) FILTER (WHERE value > 0) AS rain_days
+     FROM readings WHERE metric = 'rain_mm'
+       AND taken_at >= date_trunc('month', now() AT TIME ZONE 'Africa/Harare') - interval '11 months'
+     GROUP BY 1 ORDER BY 1`);
+
   res.json({
     today_mm: Number(today.rows[0].mm),
     last_reading: last.rows[0] ? { mm: Number(last.rows[0].value), at: last.rows[0].taken_at } : null,
     days: daily.rows.map((r) => ({ date: r.d, mm: Number(r.mm) })),
+    weeks: weekly.rows.map((r) => ({ week_start: r.wk, mm: Number(r.mm), rain_days: Number(r.rain_days) })),
+    months: monthly.rows.map((r) => ({ month: r.m, mm: Number(r.mm), rain_days: Number(r.rain_days) })),
     season: {
       start: seasonStart,
       total_mm: Number(season.rows[0].mm),
