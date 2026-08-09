@@ -146,7 +146,7 @@ const CONDITIONS = {
   },
 };
 
-async function applyAction(c, rule, action, fireParams) {
+async function applyAction(c, rule, action, fireParams, now = new Date()) {
   const fired = { rule: rule.name, actions: [] };
 
   if (action.release) {
@@ -173,7 +173,7 @@ async function applyAction(c, rule, action, fireParams) {
     }
   }
   if (action.suppress_next_day) {
-    const tomorrow = addDays(farmDateStr(), 1);
+    const tomorrow = addDays(farmDateStr(now), 1);
     const entries = action.suppress_next_day.map((template) => ({ template, date: tomorrow, rule: rule.name }));
     await c.query(
       `INSERT INTO farm_settings (key, value) VALUES ('suppressions', $1)
@@ -182,7 +182,7 @@ async function applyAction(c, rule, action, fireParams) {
            SELECT s FROM jsonb_array_elements(farm_settings.value) AS s WHERE (s->>'date') >= $2
          ) keep
        ) || EXCLUDED.value, updated_at = now()`,
-      [JSON.stringify(entries), farmDateStr()]);
+      [JSON.stringify(entries), farmDateStr(now)]);
     fired.actions.push({ suppress_next_day: action.suppress_next_day, date: tomorrow });
   }
   if (action.expire_released) {
@@ -223,7 +223,7 @@ export async function evaluateRules(c, { now = new Date() } = {}) {
     if (!inCooldown) {
       fireParams = await evaluator(c, rule.condition);
       if (fireParams) {
-        const fired = await applyAction(c, rule, rule.action, fireParams);
+        const fired = await applyAction(c, rule, rule.action, fireParams, now);
         await c.query(`UPDATE rules SET last_fired_at = $2, updated_at = now() WHERE id = $1`, [rule.id, now]);
         firings.push(fired);
       }
@@ -238,7 +238,7 @@ export async function evaluateRules(c, { now = new Date() } = {}) {
         if (s2) {
           const p2 = await s2(c, rule.two_stage.condition);
           if (p2) {
-            const fired = await applyAction(c, rule, rule.two_stage.action, p2);
+            const fired = await applyAction(c, rule, rule.two_stage.action, p2, now);
             fired.stage = 2;
             await c.query(`UPDATE rules SET stage2_fired_at = $2, updated_at = now() WHERE id = $1`, [rule.id, now]);
             firings.push(fired);

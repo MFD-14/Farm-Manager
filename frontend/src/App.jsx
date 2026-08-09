@@ -4,6 +4,7 @@ import { metaGet, metaSet, outboxCounts } from "./lib/db.js";
 import { startSyncLoop, onSyncState, pullBundle } from "./lib/sync.js";
 import DayView from "./views/DayView.jsx";
 import OwnerView from "./views/OwnerView.jsx";
+import RainView from "./views/RainView.jsx";
 import Login from "./views/Login.jsx";
 
 function TabIcon({ d }) {
@@ -83,9 +84,11 @@ export default function App() {
         </div>
       </header>
       {isOwner
-        ? <OwnerView tab={tab} />
-        : <DayView onCountsChanged={refreshCounts} />}
-      {isOwner && (
+        ? (tab === "rain" ? <RainView /> : <OwnerView tab={tab} />)
+        : (tab === "rain"
+            ? <RainView onCaptureToday={() => setTab("day")} />
+            : <DayView onCountsChanged={refreshCounts} />)}
+      {isOwner ? (
         <nav className="tabs">
           <button className={tab === "day" ? "on" : ""} onClick={() => setTab("day")}>
             <TabIcon d="M3 3v18h18M7 16l4-8 4 4 4-6" />Digest
@@ -93,8 +96,20 @@ export default function App() {
           <button className={tab === "decisions" ? "on" : ""} onClick={() => setTab("decisions")}>
             <TabIcon d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />Decisions
           </button>
+          <button className={tab === "rain" ? "on" : ""} onClick={() => setTab("rain")}>
+            <TabIcon d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z" />Rain
+          </button>
           <button className={tab === "kpis" ? "on" : ""} onClick={() => setTab("kpis")}>
             <TabIcon d="M12 20V10M18 20V4M6 20v-4" />KPIs
+          </button>
+        </nav>
+      ) : (
+        <nav className="tabs">
+          <button className={tab === "day" ? "on" : ""} onClick={() => setTab("day")}>
+            <TabIcon d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />Today
+          </button>
+          <button className={tab === "rain" ? "on" : ""} onClick={() => setTab("rain")}>
+            <TabIcon d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z" />Rain
           </button>
         </nav>
       )}

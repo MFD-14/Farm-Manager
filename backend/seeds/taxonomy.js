@@ -45,6 +45,17 @@ export const TEMPLATES = [
     instructions: [{ text: "Open the block valve for the planned duration. Photograph a wet emitter line before closing." }],
   },
   {
+    code: "W-08", title: "Rain gauge reading", domain: "W", priority: "P2", est_minutes: 1,
+    subject_type: "asset", subject_code: "RAIN-G1",
+    evidence_policy: E.E1([num("rain_mm", "Rainfall since yesterday (mm)", 0, 300, "mm")]),
+    schedule: { type: "calendar", freq: "daily", at: ["06:00"], fixed: true },
+    readings: [{ metric: "rain_mm", from: "rain_mm" }],
+    instructions: [
+      { text: "Read the gauge at the same time every morning. Zero is a required entry, not an assumed default." },
+      { text: "Empty the gauge after reading so tomorrow starts from zero." },
+    ],
+  },
+  {
     code: "C-01", title: "Kale harvest and bundle count", domain: "C", priority: "P1", est_minutes: 1,
     subject_type: "location", subject_code: "BLK-A",
     evidence_policy: { ...E.E1E2([num("bundle_count", "Bundles", 0, 2000)], "bundle_count") },

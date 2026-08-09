@@ -72,6 +72,48 @@ ownerRouter.get("/digest", auth(), async (req, res) => {
   res.json(digest);
 });
 
+// Rainfall history for the rain screen: daily totals, today, season-to-date.
+// The Zimbabwe rain year runs October to September, so the season accumulator
+// resets on 1 October.
+ownerRouter.get("/rain", auth(), async (req, res) => {
+  const days = Math.min(90, parseInt(req.query.days || "14", 10) || 14);
+  const daily = await q(
+    `SELECT to_char(date_trunc('day', taken_at AT TIME ZONE 'Africa/Harare'), 'YYYY-MM-DD') AS d,
+            SUM(value) AS mm
+     FROM readings WHERE metric = 'rain_mm'
+       AND taken_at >= now() - ($1 || ' days')::interval
+     GROUP BY 1 ORDER BY 1`, [days]);
+
+  const now = new Date();
+  const seasonStartYear = now.getUTCMonth() + 1 >= 10 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+  const seasonStart = `${seasonStartYear}-10-01`;
+  const season = await q(
+    `SELECT COALESCE(SUM(value),0) AS mm, COUNT(DISTINCT date_trunc('day', taken_at)) FILTER (WHERE value > 0) AS rain_days
+     FROM readings WHERE metric = 'rain_mm' AND taken_at >= $1::date`, [seasonStart]);
+  const last = await q(
+    `SELECT value, taken_at FROM readings WHERE metric = 'rain_mm' ORDER BY taken_at DESC LIMIT 1`);
+  const today = await q(
+    `SELECT COALESCE(SUM(value),0) AS mm FROM readings
+     WHERE metric = 'rain_mm' AND date_trunc('day', taken_at AT TIME ZONE 'Africa/Harare') =
+           date_trunc('day', now() AT TIME ZONE 'Africa/Harare')`);
+  const wettest = await q(
+    `SELECT to_char(date_trunc('day', taken_at AT TIME ZONE 'Africa/Harare'), 'YYYY-MM-DD') AS d, SUM(value) AS mm
+     FROM readings WHERE metric = 'rain_mm' AND taken_at >= $1::date
+     GROUP BY 1 ORDER BY 2 DESC LIMIT 1`, [seasonStart]);
+
+  res.json({
+    today_mm: Number(today.rows[0].mm),
+    last_reading: last.rows[0] ? { mm: Number(last.rows[0].value), at: last.rows[0].taken_at } : null,
+    days: daily.rows.map((r) => ({ date: r.d, mm: Number(r.mm) })),
+    season: {
+      start: seasonStart,
+      total_mm: Number(season.rows[0].mm),
+      rain_days: Number(season.rows[0].rain_days),
+      wettest_day: wettest.rows[0] ? { date: wettest.rows[0].d, mm: Number(wettest.rows[0].mm) } : null,
+    },
+  });
+});
+
 ownerRouter.get("/kpis", auth(), async (req, res) => {
   const days = Math.min(365, parseInt(req.query.period || "7", 10) || 7);
   const kpis = await tx((c) => computeKpis(c, { days }));

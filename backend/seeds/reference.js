@@ -135,6 +135,7 @@ export const ASSETS = [
   { code: "POOL-1", name: "Storage pool", kind: "pool", criticality: "P1" },
   { code: "DRIP-SYS", name: "Drip irrigation system", kind: "drip_block", criticality: "P1" },
   { code: "SPRAY-K1", name: "Knapsack sprayer 1", kind: "sprayer", criticality: "P2" },
+  { code: "RAIN-G1", name: "Rain gauge", kind: "tool", criticality: "P2" },
   { code: "GEN-1", name: "Generator", kind: "generator", criticality: "P1", meters: { gen_run_hours: 0 } },
   { code: "COOP-1", name: "Poultry house 1", kind: "coop", criticality: "P1" },
   { code: "KRAAL-1", name: "Cattle kraal", kind: "kraal", criticality: "P1" },

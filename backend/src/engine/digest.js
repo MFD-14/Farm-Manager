@@ -29,6 +29,7 @@ export async function buildDigest(c, dateStr = farmDateStr()) {
 
   const tank = await latest("tank_level_pct");
   const litresPumped = (await daySum("pump_hours")) * 6000;
+  const rainToday = await daySum("rain_mm");
   const bundles = await daySum("bundle_count");
   const bundlesSold = await daySum("bundles_sold");
   const salesUsd = await daySum("sales_usd");
@@ -53,6 +54,7 @@ export async function buildDigest(c, dateStr = farmDateStr()) {
     water: {
       tank_pct: tank ? Number(tank.value) : null,
       litres_pumped: litresPumped,
+      rain_mm: rainToday,
     },
     money: { bundles_harvested: bundles, bundles_sold: bundlesSold, sales_usd: salesUsd,
              cash_variance: cashVariance ? Number(cashVariance.value) : null },
