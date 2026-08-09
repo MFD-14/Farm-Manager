@@ -56,10 +56,21 @@ const CONDITIONS = {
     return pct < cond.value ? { stored_pct: Math.round(pct * 10) / 10 } : null;
   },
   async rain_24h_at_least(c, cond) {
+    // Gauge first: an observed reading wins over any forecast (spec T2).
     const r = await c.query(
       `SELECT COALESCE(SUM(value),0) AS s FROM readings WHERE metric = 'rain_mm' AND taken_at >= now() - interval '24 hours'`);
     const mm = Number(r.rows[0].s);
-    return mm >= cond.value ? { rain_mm: mm } : null;
+    if (mm >= cond.value) return { rain_mm: mm, source: "gauge" };
+    // Forecast covers the window the gauge cannot: tomorrow. Acting ahead of
+    // confident heavy rain saves the water before it falls.
+    const { forecastFor } = await import("../workers/forecast.js");
+    const { farmDateStr, addDays } = await import("../util/time.js");
+    const tomorrow = await forecastFor(c, addDays(farmDateStr(), 1));
+    const minProb = cond.forecast_min_prob ?? 60;
+    if (tomorrow && tomorrow.rain_mm >= cond.value && tomorrow.prob_pct >= minProb) {
+      return { rain_mm: tomorrow.rain_mm, prob_pct: tomorrow.prob_pct, source: "forecast", for_date: tomorrow.date };
+    }
+    return null;
   },
   async faw_threshold(c, cond) {
     const r = await c.query(

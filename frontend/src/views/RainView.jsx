@@ -72,6 +72,8 @@ export default function RainView({ onCaptureToday }) {
         </div>
       </div>
 
+      {data.forecast?.daily?.length > 0 && <ForecastStrip forecast={data.forecast} />}
+
       <div className="rain-seg">
         {[["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"]].map(([k, label]) => (
           <button key={k} className={mode === k ? "on" : ""} onClick={() => setMode(k)}>{label}</button>
@@ -172,6 +174,36 @@ function BarCard({ items, emptyText, showNorm = false }) {
         ))}
       </div>
     </div>
+  );
+}
+
+// Next-7-days forecast strip (Open-Meteo). Droplet opacity tracks probability;
+// a heavy-rain day (>= 15 mm at >= 60%) is flagged because it will trigger the
+// T2 suppression automatically.
+function ForecastStrip({ forecast }) {
+  const ageH = Math.round((Date.now() - new Date(forecast.fetched_at).getTime()) / 3_600_000);
+  return (
+    <>
+      <div className="section-title">Next 7 days · forecast{ageH > 24 ? ` (stale, ${ageH}h old)` : ""}</div>
+      <div className="card rain-fc">
+        {forecast.daily.slice(0, 7).map((d, i) => {
+          const heavy = d.rain_mm >= 15 && d.prob_pct >= 60;
+          return (
+            <div className={`fc-day ${heavy ? "heavy" : ""}`} key={d.date}>
+              <span className="fd">{i === 0 ? "Today" : dayLabel(d.date)}</span>
+              <svg width="16" height="20" viewBox="0 0 16 20" style={{ opacity: Math.max(0.15, d.prob_pct / 100) }}>
+                <path d="M8 1 C9.5 5 14 9 14 13 a6 6 0 1 1 -12 0 C2 9 6.5 5 8 1 Z"
+                  fill="#2980b9" />
+              </svg>
+              <span className="fmm">{d.rain_mm > 0 ? `${fmt(d.rain_mm)}` : "–"}</span>
+              <span className="fpp">{d.prob_pct}%</span>
+              <span className="ft">{Math.round(d.tmax)}°<i>{Math.round(d.tmin)}°</i></span>
+              {heavy && <span className="fflag">T2</span>}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -304,5 +336,6 @@ function Drop({ fill }) {
 
 const fmt = (n) => (Math.round(n * 10) / 10).toString();
 const fmtDate = (d) => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+const dayLabel = (d) => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "short" });
 const wkLabel = (d) => new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 const moLabel = (m) => new Date(m + "-15T12:00:00Z").toLocaleDateString("en-GB", { month: "short" });

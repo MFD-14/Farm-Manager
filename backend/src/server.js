@@ -8,6 +8,7 @@ import { runEscalationSweep } from "./engine/escalation.js";
 import { evaluateRules } from "./engine/rules.js";
 import { sendDigest } from "./engine/digest.js";
 import { processVimQueue, vimOutageSweep } from "./workers/vim.js";
+import { fetchForecast } from "./workers/forecast.js";
 import { farmDateStr } from "./util/time.js";
 
 const TZ = { timezone: config.farmTz };
@@ -16,6 +17,14 @@ async function main() {
   await migrate();
   const app = createApp();
   app.listen(config.port, () => console.log(`wfm-backend listening on :${config.port}`));
+
+  // 04:15 farm time: pull the forecast so T2 can evaluate it before release;
+  // also fetch once at boot. Failures are silent — the gauge path never depends
+  // on the network.
+  tx((c) => fetchForecast(c)).catch(() => {});
+  cron.schedule("15 4 * * *", async () => {
+    try { await tx((c) => fetchForecast(c)); } catch { /* keep last snapshot */ }
+  }, TZ);
 
   // 04:45 farm time: materialise the day (spec 3.6).
   cron.schedule(config.releaseCron, async () => {

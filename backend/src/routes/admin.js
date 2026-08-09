@@ -147,6 +147,9 @@ ownerRouter.get("/rain", auth(), async (req, res) => {
   const seasons = [currentCurve];
   if (previousCurve.points.length) seasons.push(previousCurve);
 
+  const forecastRow = await q(`SELECT value FROM farm_settings WHERE key = 'forecast'`);
+  const forecast = forecastRow.rows[0]?.value || null;
+
   res.json({
     today_mm: Number(today.rows[0].mm),
     last_reading: last.rows[0] ? { mm: Number(last.rows[0].value), at: last.rows[0].taken_at } : null,
@@ -154,6 +157,7 @@ ownerRouter.get("/rain", auth(), async (req, res) => {
     weeks: weekly.rows.map((r) => ({ week_start: r.wk, mm: Number(r.mm), rain_days: Number(r.rain_days) })),
     months: monthly.rows.map((r) => ({ month: r.m, mm: Number(r.mm), rain_days: Number(r.rain_days) })),
     seasons,
+    forecast,
     season: {
       start: seasonStart,
       total_mm: Number(season.rows[0].mm),
@@ -181,6 +185,12 @@ ownerRouter.post("/absence", auth(), requireRole("owner"), async (req, res) => {
 ownerRouter.post("/release-now", auth(), requireRole("owner", "admin"), async (req, res) => {
   const result = await tx((c) => runRelease(c, req.body?.date || farmDateStr()));
   res.json(result);
+});
+
+ownerRouter.post("/forecast/refresh", auth(), requireRole("owner", "admin"), async (req, res) => {
+  const { fetchForecast } = await import("../workers/forecast.js");
+  const result = await tx((c) => fetchForecast(c));
+  res.status(result.ok ? 200 : 502).json(result);
 });
 
 // Devices (spec 6.2, 6.3): register, restore, revoke.

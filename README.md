@@ -58,6 +58,15 @@ verification profiles, the 0.80/0.50 confidence thresholds, one-retake flow and
 the outage sampling fallback. VIM runs heuristic by default and switches to
 Claude Vision with `VIM_MODE=claude` plus an API key.
 
+**Forecast feed.** Open-Meteo (no API key, free for non-commercial use, ~10k
+requests/day) is fetched daily at 04:15 farm time: 7-day precipitation, rain
+probability, temperatures and FAO-56 reference evapotranspiration for the farm
+coordinates. Trigger T2 acts ahead of confident heavy rain (>= 15 mm at >= 60%
+probability tomorrow) while an observed gauge reading always wins over the
+forecast; a stale snapshot (> 36 h) is ignored and the gauge path never depends
+on the network. The rain page shows the 7-day strip with T2 flags and the
+digest carries "rain expected tomorrow".
+
 **Channels (spec §4.4, §1.7).** WhatsApp webhook (idempotent on message id,
 allow-listed numbers, 24-hour window tracking, button replies appended as
 events, inbound media fetched and attached, ambiguous media prompting a task
@@ -119,6 +128,7 @@ node src/jobs/rebuild-projections.js   # replay the event log
 | `VIM_MODE` + `ANTHROPIC_API_KEY` | `heuristic` (default) or `claude` for Claude Vision verification |
 | `WA_TOKEN`, `WA_PHONE_ID`, `WA_VERIFY_TOKEN` | WhatsApp Business Cloud API; sender degrades to log-only without them |
 | `FARM_TZ` | Farm timezone, default `Africa/Harare` |
+| `FARM_LAT`, `FARM_LNG` | Farm coordinates for the forecast feed, default Kwekwe (-18.9281, 29.8149) |
 
 ## Rollout
 

@@ -28,6 +28,11 @@ function Digest() {
       </div>
       <div className="card">
         <div className="kv"><span>Rain today</span><b>{digest.water.rain_mm ?? 0} mm</b></div>
+        {digest.water.rain_expected_tomorrow && (
+          <div className="kv"><span>Rain expected tomorrow</span>
+            <b>{digest.water.rain_expected_tomorrow.mm} mm · {digest.water.rain_expected_tomorrow.prob_pct}%</b>
+          </div>
+        )}
         <div className="kv"><span>Litres pumped</span><b>{digest.water.litres_pumped.toLocaleString()}</b></div>
         <div className="kv"><span>Bundles harvested</span><b>{digest.money.bundles_harvested}</b></div>
         <div className="kv"><span>Bundles sold</span><b>{digest.money.bundles_sold}</b></div>

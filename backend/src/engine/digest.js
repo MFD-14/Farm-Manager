@@ -48,6 +48,10 @@ export async function buildDigest(c, dateStr = farmDateStr()) {
     exceptions.push({ kind: "cash_variance", value: Number(cashVariance.value) });
   }
 
+  const { forecastFor } = await import("../workers/forecast.js");
+  const { addDays } = await import("../util/time.js");
+  const fcTomorrow = await forecastFor(c, addDays(dateStr, 1));
+
   const digest = {
     date: dateStr,
     completion: { total, verified, skipped, missed, pending_review: pendingReview },
@@ -55,6 +59,9 @@ export async function buildDigest(c, dateStr = farmDateStr()) {
       tank_pct: tank ? Number(tank.value) : null,
       litres_pumped: litresPumped,
       rain_mm: rainToday,
+      rain_expected_tomorrow: fcTomorrow
+        ? { mm: fcTomorrow.rain_mm, prob_pct: fcTomorrow.prob_pct }
+        : null,
     },
     money: { bundles_harvested: bundles, bundles_sold: bundlesSold, sales_usd: salesUsd,
              cash_variance: cashVariance ? Number(cashVariance.value) : null },
