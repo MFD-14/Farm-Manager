@@ -2,7 +2,7 @@
 // colour-coded state, unsynced counter in the top bar. Cards open the capture
 // sheet; every flow ends "reported, will sync".
 import React, { useEffect, useState, useCallback } from "react";
-import { getPlanInstances } from "../lib/db.js";
+import { getPlanInstances, metaGet } from "../lib/db.js";
 import { pullBundle } from "../lib/sync.js";
 import { markSeen } from "../lib/capture.js";
 import CaptureSheet from "../components/CaptureSheet.jsx";
@@ -23,12 +23,14 @@ export default function DayView({ onCountsChanged }) {
   const [instances, setInstances] = useState([]);
   const [active, setActive] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [windows, setWindows] = useState([]);
 
   const refresh = useCallback(async () => {
     let list = await getPlanInstances();
     if (!list.length && navigator.onLine) {
       try { list = await pullBundle(); } catch { /* offline start: cached plan only */ }
     }
+    setWindows((await metaGet("active_windows")) || []);
     list.sort((a, b) =>
       (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9) ||
       (timeOf(a)?.getTime() ?? 0) - (timeOf(b)?.getTime() ?? 0));
@@ -56,6 +58,13 @@ export default function DayView({ onCountsChanged }) {
   return (
     <div className="wrap">
       <div className="daytitle">{today}</div>
+      {windows.map((w, i) => (
+        <div className="withhold-banner" key={i}>
+          <b>{w.type === "phi" ? "Pre-harvest interval" : "Withdrawal"} active</b> · {w.subject_name}
+          {" "}until {new Date(w.until).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+          {" "}({w.days_remaining}d left) · {w.product}
+        </div>
+      ))}
       {loading && <div className="empty">Loading plan…</div>}
       {!loading && !instances.length && (
         <div className="empty">

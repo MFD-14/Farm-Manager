@@ -116,6 +116,8 @@ export async function pullBundle() {
   await putPlanInstances(merged);
   await metaSet("reference", bundle.reference_delta);
   await metaSet("bundle_date", bundle.date);
+  await metaSet("active_windows", bundle.active_windows || []);
+  await metaSet("last_values", bundle.last_values || {});
   return merged;
 }
 

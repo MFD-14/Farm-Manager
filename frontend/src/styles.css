@@ -267,6 +267,11 @@ button { font-family:var(--fb); cursor:pointer; }
   color:var(--ts); }
 .wb-table tr:last-child td { border-bottom:none; }
 
+/* ── Withholding banner + capture hints ──────────────────── */
+.withhold-banner { background:#fef3c7; border-left:4px solid var(--gold); color:#78350f;
+  border-radius:10px; padding:10px 13px; font-size:13px; margin-bottom:10px; line-height:1.5; }
+.last-hint { font-weight:400; text-transform:none; letter-spacing:0; color:var(--tm); }
+
 .rain-season-track { position:relative; height:14px; border-radius:8px; background:var(--bl);
   margin:10px 0 12px; overflow:hidden; }
 .rain-season-track .fill { height:100%; border-radius:8px;

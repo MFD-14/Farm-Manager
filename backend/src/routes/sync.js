@@ -93,12 +93,42 @@ syncRouter.get("/bundle", auth(), async (req, res) => {
     inventory: (await q(`SELECT id, name, unit, category, on_hand, reorder_point FROM inventory_items`)).rows,
   };
 
+  // Herdwatch pattern (R18/R26): active withholding windows are a first-class
+  // derived obligation, pushed to the phone so the caretaker sees them offline.
+  const windowsRow = await q(`SELECT value FROM farm_settings WHERE key = 'active_windows'`);
+  const activeWindows = (windowsRow.rows[0]?.value || [])
+    .filter((w) => new Date(w.until) > new Date());
+  const withSubjects = [];
+  for (const w of activeWindows) {
+    const loc = w.subject_id
+      ? await q(`SELECT name FROM locations WHERE id = $1
+                 UNION SELECT name FROM herds WHERE id = $1`, [w.subject_id])
+      : { rows: [] };
+    withSubjects.push({
+      ...w,
+      subject_name: loc.rows[0]?.name || "farm",
+      days_remaining: Math.max(0, Math.ceil((new Date(w.until) - Date.now()) / 86_400_000)),
+    });
+  }
+
+  // AgriWebb pattern: last recorded values per template, so capture screens can
+  // show "last: 62" beside each field and speed repeat entries.
+  const lastValues = await q(
+    `SELECT DISTINCT ON (template_code) template_code,
+            evidence_summary->'fields' AS fields, closed_at
+     FROM task_instances
+     WHERE state IN ('verified_closed','done_reported','needs_review')
+       AND evidence_summary->'fields' IS NOT NULL AND evidence_summary->'fields' <> '{}'::jsonb
+     ORDER BY template_code, COALESCE(closed_at, updated_at) DESC`);
+
   res.json({
     date: dateStr,
     plan: planRow ? { ...planRow, instances } : null,
     open_instances: openExtra.rows,
     templates_delta: templates.rows,
     reference_delta: reference,
+    active_windows: withSubjects,
+    last_values: Object.fromEntries(lastValues.rows.map((r) => [r.template_code, { fields: r.fields, at: r.closed_at }])),
     cursor: new Date().toISOString(),
   });
 });

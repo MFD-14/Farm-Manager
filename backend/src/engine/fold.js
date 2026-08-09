@@ -116,10 +116,13 @@ async function maybeMortalityBatchUpdate(c, event, instance) {
 
 // Fold a single event inside an open transaction. Returns
 // {status: 'accepted'|'duplicate'|'rejected', reason?}
-export async function foldEvent(c, event, { skipSideEffects = false } = {}) {
-  // Idempotency on event_uuid (spec 6.2): duplicates are success.
-  const dup = await c.query(`SELECT 1 FROM task_events WHERE event_uuid = $1`, [event.event_uuid]);
-  if (dup.rows.length) return { status: "duplicate" };
+export async function foldEvent(c, event, { skipSideEffects = false, replay = false } = {}) {
+  // Idempotency on event_uuid (spec 6.2): duplicates are success. Replay mode
+  // re-applies an event already in the log, so it skips the check and the insert.
+  if (!replay) {
+    const dup = await c.query(`SELECT 1 FROM task_events WHERE event_uuid = $1`, [event.event_uuid]);
+    if (dup.rows.length) return { status: "duplicate" };
+  }
 
   if (!event.type) return { status: "rejected", reason: "missing type" };
 
@@ -136,30 +139,62 @@ export async function foldEvent(c, event, { skipSideEffects = false } = {}) {
   // recording the conflict in the payload for audit.
   let nextState = instance?.state;
   let conflict = null;
+  let policy = {};
   if (instance) {
     const t = applyTransition(instance, event.type);
     if (t.ok) nextState = t.next;
     else conflict = t.reason;
+    policy = instance.params?.evidence_policy_resolved
+      || (await c.query(`SELECT evidence_policy FROM task_templates WHERE id = $1`, [instance.template_id])).rows[0]?.evidence_policy
+      || {};
   }
 
-  await c.query(
-    `INSERT INTO task_events (event_uuid, instance_id, actor_type, actor_id, type, payload, device_time, server_time, device_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7, COALESCE($8, clock_timestamp()), $9)`,
-    [event.event_uuid, event.instance_id || null, event.actor_type || "system", event.actor_id || null,
-     event.type, { ...(event.payload || {}), ...(conflict ? { _fold_conflict: conflict } : {}) },
-     event.device_time || null, event.server_time || null, event.device_id || null]);
+  // Agworld pattern (spec R27): chemical application completions carry the
+  // weather at application time as part of the forensic record. Enriched into
+  // the immutable event payload at accept time so replay reproduces it.
+  if (instance && event.type === "done_reported" && !conflict
+      && (policy.vim_profile === "spray_scene" || policy.inventory_out)
+      && !event.payload?.weather_at_application) {
+    const fc = await c.query(`SELECT value FROM farm_settings WHERE key = 'forecast'`);
+    const dateStr = (event.device_time ? new Date(event.device_time) : new Date())
+      .toISOString().slice(0, 10);
+    const day = fc.rows[0]?.value?.daily?.find((x) => x.date === dateStr);
+    const rain = await c.query(
+      `SELECT COALESCE(SUM(value),0) AS s FROM readings
+       WHERE metric = 'rain_mm' AND taken_at >= now() - interval '24 hours'`);
+    event = {
+      ...event,
+      payload: {
+        ...(event.payload || {}),
+        weather_at_application: {
+          tmax: day?.tmax ?? null, tmin: day?.tmin ?? null,
+          rain_forecast_mm: day?.rain_mm ?? null, rain_prob_pct: day?.prob_pct ?? null,
+          rain_observed_24h_mm: Number(rain.rows[0].s),
+          stamped_at: new Date().toISOString(),
+        },
+      },
+    };
+  }
+
+  if (!replay) {
+    await c.query(
+      `INSERT INTO task_events (event_uuid, instance_id, actor_type, actor_id, type, payload, device_time, server_time, device_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7, COALESCE($8, clock_timestamp()), $9)`,
+      [event.event_uuid, event.instance_id || null, event.actor_type || "system", event.actor_id || null,
+       event.type, { ...(event.payload || {}), ...(conflict ? { _fold_conflict: conflict } : {}) },
+       event.device_time || null, event.server_time || null, event.device_id || null]);
+  }
 
   if (!instance || conflict) return { status: "accepted", conflict };
-
-  const policy = instance.params?.evidence_policy_resolved
-    ? instance.params.evidence_policy_resolved
-    : (await c.query(`SELECT evidence_policy FROM task_templates WHERE id = $1`, [instance.template_id])).rows[0]?.evidence_policy || {};
 
   // Evidence summary maintenance
   const summary = instance.evidence_summary || {};
   summary.fields = summary.fields || {};
   if (event.type === "field_recorded" || event.type === "done_reported") {
     Object.assign(summary.fields, event.payload?.fields || {});
+  }
+  if (event.payload?.weather_at_application) {
+    summary.weather = event.payload.weather_at_application;
   }
   if (event.type === "media_attached") {
     const kind = event.payload?.kind || "photo";
@@ -222,14 +257,12 @@ export async function rebuildProjections(c) {
   await c.query(`DELETE FROM readings WHERE source_event_uuid IS NOT NULL`);
   await c.query(`DELETE FROM inventory_moves WHERE source_event_uuid IS NOT NULL`);
   await c.query(`UPDATE meter_accumulators SET total = last_service_at_total`);
+  // Replay through the same handlers with side effects off. The log itself is
+  // never touched: replay mode re-applies each event's state change and
+  // projections in seq order without delete or re-insert.
   const { rows: events } = await c.query(`SELECT * FROM task_events ORDER BY seq`);
-  // Replay through the same handlers, with side effects (vim jobs, chains, notifications) off.
   for (const e of events) {
-    const saved = e.event_uuid;
-    await c.query(`ALTER TABLE task_events DISABLE TRIGGER task_events_no_update`);
-    await c.query(`DELETE FROM task_events WHERE event_uuid = $1`, [saved]);
-    await c.query(`ALTER TABLE task_events ENABLE TRIGGER task_events_no_update`);
-    await foldEvent(c, e, { skipSideEffects: true });
+    await foldEvent(c, e, { skipSideEffects: true, replay: true });
   }
   return events.length;
 }

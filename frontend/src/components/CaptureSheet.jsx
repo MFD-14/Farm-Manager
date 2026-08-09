@@ -2,8 +2,9 @@
 // pre-focused, camera pre-set, Done disabled until the evidence policy is
 // satisfiable, Skip and Problem always one tap away and always cheaper than
 // silence (spec 4.3).
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { reportDone, requestSkip, flagProblem, evidenceReady, compressAndStamp, SKIP_REASONS } from "../lib/capture.js";
+import { metaGet } from "../lib/db.js";
 
 export default function CaptureSheet({ instance, onClose }) {
   const policy = useMemo(
@@ -15,8 +16,27 @@ export default function CaptureSheet({ instance, onClose }) {
   const [skipReason, setSkipReason] = useState(SKIP_REASONS[0]);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [lastValues, setLastValues] = useState(null);
+  const [rainAhead, setRainAhead] = useState(null);
   const fileRef = useRef(null);
   const videoRef = useRef(null);
+
+  const isSpray = policy.vim_profile === "spray_scene" || policy.inventory_out;
+
+  useEffect(() => {
+    (async () => {
+      // AgriWebb pattern: show the previous entry beside each field.
+      const lv = (await metaGet("last_values")) || {};
+      setLastValues(lv[instance.template_code] || null);
+      // Agworld pattern: warn before spraying into forecast rain.
+      if (isSpray) {
+        const rc = await metaGet("rain_cache");
+        const next24 = rc?.forecast?.daily?.slice(0, 2) || [];
+        const wet = next24.find((d) => d.rain_mm >= 5 && d.prob_pct >= 50);
+        if (wet) setRainAhead(wet);
+      }
+    })();
+  }, [instance.template_code, isSpray]);
 
   const photos = mediaItems.filter((m) => m.kind === "photo").length;
   const videos = mediaItems.filter((m) => m.kind === "video").length;
@@ -80,6 +100,13 @@ export default function CaptureSheet({ instance, onClose }) {
 
         {instance.retake_reason && <div className="retake">Retake asked: {instance.retake_reason}</div>}
 
+        {rainAhead && isOpen && (
+          <div className="retake">
+            Rain forecast ({rainAhead.rain_mm} mm, {rainAhead.prob_pct}%) within 24–48 h —
+            spray may wash off. Consider waiting.
+          </div>
+        )}
+
         {(instance.instructions || []).length > 0 && (
           <div className="instructions">
             {(instance.instructions || []).map((s, i) => <div key={i}>{s.text}</div>)}
@@ -97,7 +124,12 @@ export default function CaptureSheet({ instance, onClose }) {
           <>
             {(policy.fields || []).map((f) => (
               <div className="field" key={f.key}>
-                <label>{f.label || f.key}{f.unit ? ` (${f.unit})` : ""}</label>
+                <label>
+                  {f.label || f.key}{f.unit ? ` (${f.unit})` : ""}
+                  {lastValues?.fields?.[f.key] !== undefined && (
+                    <span className="last-hint"> · last: {String(lastValues.fields[f.key])}</span>
+                  )}
+                </label>
                 {f.type === "choice" ? (
                   <select value={fields[f.key] || ""} onChange={(e) => setFields({ ...fields, [f.key]: e.target.value })}>
                     <option value="">—</option>

@@ -44,6 +44,15 @@ export async function buildDigest(c, dateStr = farmDateStr()) {
   const exceptions = decisions.map((d) => ({
     instance_id: d.id, code: d.template_code, title: d.title, state: d.state,
   }));
+
+  // Herdwatch-style withholding board: active PHI/withdrawal windows with countdowns.
+  const windowsRow = await c.query(`SELECT value FROM farm_settings WHERE key = 'active_windows'`);
+  const withholdings = (windowsRow.rows[0]?.value || [])
+    .filter((w) => new Date(w.until) > new Date())
+    .map((w) => ({
+      type: w.type, product: w.product, until: w.until,
+      days_remaining: Math.max(0, Math.ceil((new Date(w.until) - Date.now()) / 86_400_000)),
+    }));
   if (cashVariance && Math.abs(Number(cashVariance.value)) > 5) {
     exceptions.push({ kind: "cash_variance", value: Number(cashVariance.value) });
   }
@@ -65,6 +74,7 @@ export async function buildDigest(c, dateStr = farmDateStr()) {
     },
     money: { bundles_harvested: bundles, bundles_sold: bundlesSold, sales_usd: salesUsd,
              cash_variance: cashVariance ? Number(cashVariance.value) : null },
+    withholdings,
     exceptions,
   };
 
