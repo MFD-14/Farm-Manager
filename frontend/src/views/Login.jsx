@@ -1,22 +1,38 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { getServerUrl, setServerUrl, isNativeShell } from "../lib/api.js";
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [server, setServer] = useState("");
+  const [showServer, setShowServer] = useState(false);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  const native = isNativeShell();
+
+  useEffect(() => {
+    const current = getServerUrl();
+    setServer(current);
+    // The installed app is loaded from the phone itself, so it cannot guess the
+    // server: ask for it up front until one is saved.
+    setShowServer(native && !current);
+  }, [native]);
 
   async function submit(e) {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
+      if (showServer || native) await setServerUrl(server);
       await onLogin(email.trim(), password);
     } catch (e2) {
-      setErr(e2.status === 401 ? "Wrong email or password" : "Cannot reach the server");
+      setErr(e2.status === 401 ? "Wrong email or password" : "Cannot reach the server. Check the server address.");
+      if (e2.status !== 401) setShowServer(true);
     } finally {
       setBusy(false);
     }
   }
+
+  const needsServer = native && !server.trim();
 
   return (
     <form className="login" onSubmit={submit}>
@@ -28,6 +44,14 @@ export default function Login({ onLogin }) {
       </div>
       <h1>Woodlands Farm Manager</h1>
       <div className="tagline">119.2 ha · Kwekwe, Midlands Province</div>
+      {showServer && (
+        <div className="field">
+          <label>Server address</label>
+          <input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off"
+            placeholder="https://farm.example.com" value={server}
+            onChange={(e) => setServer(e.target.value)} />
+        </div>
+      )}
       <div className="field">
         <label>Email</label>
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
@@ -37,9 +61,14 @@ export default function Login({ onLogin }) {
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
       </div>
       {err && <p style={{ color: "var(--r5)", fontSize: 13 }}>{err}</p>}
-      <button className="btn primary block" disabled={busy || !email || !password}>
+      <button className="btn primary block" disabled={busy || !email || !password || needsServer}>
         {busy ? "Signing in…" : "Sign in"}
       </button>
+      {!showServer && (
+        <button type="button" className="link-btn" onClick={() => setShowServer(true)}>
+          Change server address
+        </button>
+      )}
     </form>
   );
 }

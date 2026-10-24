@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Woodlands</string>
+    <string name="title_activity_main">Woodlands</string>
+    <string name="package_name">farm.woodlands.manager</string>
+    <string name="custom_url_scheme">farm.woodlands.manager</string>
+</resources>

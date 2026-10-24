@@ -1,0 +1,43 @@
+# One-command deployment: `docker compose up -d`, then open http://<host>:4000
+# For phones away from the farm network, put this behind HTTPS (see DEPLOY.md).
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wfm
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-me}
+      POSTGRES_DB: wfm
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wfm"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://wfm:${DB_PASSWORD:-change-me}@db:5432/wfm
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      OWNER_PASSWORD: ${OWNER_PASSWORD:?set OWNER_PASSWORD in .env}
+      CARETAKER_PASSWORD: ${CARETAKER_PASSWORD:?set CARETAKER_PASSWORD in .env}
+      FARM_TZ: Africa/Harare
+      TANK_USABLE: ${TANK_USABLE:-80000}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      VIM_MODE: ${VIM_MODE:-heuristic}
+      WA_TOKEN: ${WA_TOKEN:-}
+      WA_PHONE_ID: ${WA_PHONE_ID:-}
+      WA_VERIFY_TOKEN: ${WA_VERIFY_TOKEN:-change-me-verify}
+    ports:
+      - "4000:4000"
+    volumes:
+      - media:/data
+
+volumes:
+  pgdata:
+  media:

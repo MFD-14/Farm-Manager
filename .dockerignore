@@ -1,0 +1,8 @@
+**/node_modules
+frontend/dist
+frontend/dev-dist
+frontend/android
+frontend/ios
+backend/media
+backend/.env
+.git

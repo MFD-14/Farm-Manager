@@ -1,0 +1,84 @@
+# Builds the Android app on every push to main that touches the frontend and
+# publishes it at a fixed address a phone can download from:
+#   https://github.com/MFD-14/Farm-Manager/releases/download/android-latest/woodlands.apk
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install and build web bundle
+        run: |
+          npm ci
+          npm run build
+          npx cap sync android
+
+      # Optional production signing: add these repository secrets to sign with
+      # your own key instead of the committed sideload key.
+      - name: Decode production keystore
+        if: ${{ env.KEYSTORE_B64 != '' }}
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        working-directory: frontend/android
+        env:
+          APP_VERSION_CODE: ${{ github.run_number }}
+          APP_VERSION_NAME: 1.2.${{ github.run_number }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/woodlands.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: woodlands-apk
+          path: ${{ runner.temp }}/woodlands.apk
+
+      - name: Publish to the android-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-latest --yes --cleanup-tag || true
+          gh release create android-latest "$RUNNER_TEMP/woodlands.apk" \
+            --title "Woodlands for Android (build ${{ github.run_number }})" \
+            --notes "Install on Android: open this page on the phone, tap woodlands.apk, allow installs from your browser when asked. Updates install over the previous version and keep unsynced data. Built from ${{ github.sha }}." \
+            --target "${{ github.sha }}"

@@ -267,6 +267,12 @@ button { font-family:var(--fb); cursor:pointer; }
   color:var(--ts); }
 .wb-table tr:last-child td { border-bottom:none; }
 
+.link-btn { display:block; margin:14px auto 0; background:none; border:none; color:var(--tm);
+  font-size:13px; text-decoration:underline; text-underline-offset:3px; }
+
+/* Native shells draw under the status bar and home indicator. */
+.topbar { padding-top:calc(13px + env(safe-area-inset-top)); }
+
 /* ── Farm profile ────────────────────────────────────────── */
 .farm-sub { font-size:13px; color:var(--tm); margin:-10px 2px 14px; }
 .farm-count { font-family:var(--fd); font-size:22px; font-weight:700; color:var(--e8);

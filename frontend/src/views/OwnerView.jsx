@@ -1,7 +1,21 @@
 // Owner console (spec 4.5, 6.2): exceptions-first digest, the decision queue
 // with claim-versus-evidence side by side, and the KPI board.
 import React, { useEffect, useState, useCallback } from "react";
-import { apiJson } from "../lib/api.js";
+import { apiJson, mediaObjectUrl } from "../lib/api.js";
+
+function EvidencePhoto({ mediaUuid }) {
+  const [src, setSrc] = useState(null);
+  useEffect(() => {
+    let url = null;
+    let cancelled = false;
+    mediaObjectUrl(mediaUuid)
+      .then((u) => { url = u; if (!cancelled) setSrc(u); })
+      .catch(() => {});
+    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
+  }, [mediaUuid]);
+  if (!src) return <div className="evidence-note" style={{ padding: 12 }}>Loading photo…</div>;
+  return <img src={src} alt="" style={{ width: "100%", borderRadius: 10, marginTop: 8 }} />;
+}
 
 export default function OwnerView({ tab }) {
   if (tab === "decisions") return <Decisions />;
@@ -98,8 +112,7 @@ function Decisions() {
                 <div className="kv" key={k}><span>{k}</span><b>{String(v)}</b></div>
               ))}
               {(detail.media || []).filter((m) => m.status === "stored" && m.kind === "photo").map((m) => (
-                <img key={m.media_uuid} src={`/api/media/${m.media_uuid}`} alt=""
-                  style={{ width: "100%", borderRadius: 10, marginTop: 8 }} />
+                <EvidencePhoto key={m.media_uuid} mediaUuid={m.media_uuid} />
               ))}
             </div>
 

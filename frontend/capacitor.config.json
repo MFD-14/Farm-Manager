@@ -1,0 +1,15 @@
+{
+  "appId": "farm.woodlands.manager",
+  "appName": "Woodlands",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true
+  },
+  "ios": {
+    "contentInset": "always"
+  }
+}

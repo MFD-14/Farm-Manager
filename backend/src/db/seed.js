@@ -13,16 +13,23 @@ export async function seed({ withUsers = true } = {}) {
     // Users
     let owner, caretaker;
     if (withUsers) {
-      const hash = bcrypt.hashSync("woodlands", 10);
+      // First-run passwords. An existing account keeps its password on re-seed;
+      // deployments set OWNER_PASSWORD / CARETAKER_PASSWORD so the server never
+      // goes live on the demo password.
+      const ownerHash = bcrypt.hashSync(process.env.OWNER_PASSWORD || "woodlands", 10);
+      const careHash = bcrypt.hashSync(process.env.CARETAKER_PASSWORD || "woodlands", 10);
+      if (process.env.NODE_ENV === "production" && (!process.env.OWNER_PASSWORD || !process.env.CARETAKER_PASSWORD)) {
+        console.warn("WARNING: OWNER_PASSWORD / CARETAKER_PASSWORD not set; new accounts use the demo password.");
+      }
       const or = await c.query(
         `INSERT INTO users (email, password_hash, name, role, phone)
          VALUES ('owner@woodlands.farm', $1, 'Owner', 'owner', '+263770000001')
-         ON CONFLICT (email) DO UPDATE SET updated_at = now() RETURNING id`, [hash]);
+         ON CONFLICT (email) DO UPDATE SET updated_at = now() RETURNING id`, [ownerHash]);
       owner = or.rows[0].id;
       const cr = await c.query(
         `INSERT INTO users (email, password_hash, name, role, phone)
          VALUES ('caretaker@woodlands.farm', $1, 'Caretaker', 'caretaker', '+263770000002')
-         ON CONFLICT (email) DO UPDATE SET updated_at = now() RETURNING id`, [hash]);
+         ON CONFLICT (email) DO UPDATE SET updated_at = now() RETURNING id`, [careHash]);
       caretaker = cr.rows[0].id;
       await c.query(
         `INSERT INTO wa_contacts (user_id, wa_phone) VALUES ($1,'+263770000001'), ($2,'+263770000002')
