@@ -4,7 +4,9 @@ import { pool, tx } from "./pool.js";
 import {
   TEMPLATES, CHAIN_SUPPORT_TEMPLATES,
 } from "../../seeds/taxonomy.js";
-import { ESCALATION_PROFILES, RULES, ASSETS, LOCATIONS, HERDS, INVENTORY } from "../../seeds/reference.js";
+import {
+  ESCALATION_PROFILES, RULES, ASSETS, LOCATIONS, HERDS, POULTRY_BATCHES, INVENTORY, WATER_SYSTEM,
+} from "../../seeds/reference.js";
 
 export async function seed({ withUsers = true } = {}) {
   await tx(async (c) => {
@@ -45,26 +47,49 @@ export async function seed({ withUsers = true } = {}) {
       assetIds[a.code] = r.rows[0].id;
     }
 
-    // Locations
+    // Locations. Descriptive fields refresh on re-seed; plant_count is left
+    // alone on conflict because anchor events maintain it once the farm runs.
     const locIds = {};
     for (const l of LOCATIONS) {
       const r = await c.query(
-        `INSERT INTO locations (code, name, kind, crop, plant_count, irrigated, rainfed_capable)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name RETURNING id`,
-        [l.code, l.name, l.kind, l.crop || null, l.plant_count || null, !!l.irrigated, !!l.rainfed_capable]);
+        `INSERT INTO locations (code, name, kind, crop, plant_count, irrigated, rainfed_capable, hectares, soil, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, crop = EXCLUDED.crop,
+           irrigated = EXCLUDED.irrigated, rainfed_capable = EXCLUDED.rainfed_capable,
+           hectares = EXCLUDED.hectares, soil = EXCLUDED.soil, status = EXCLUDED.status,
+           updated_at = now()
+         RETURNING id`,
+        [l.code, l.name, l.kind, l.crop || null, l.plant_count || null, !!l.irrigated,
+         !!l.rainfed_capable, l.hectares ?? null, l.soil || null, l.status || "active"]);
       locIds[l.code] = r.rows[0].id;
     }
 
-    // Herd
+    // Herds. head_count is a fold-maintained projection, so an existing herd
+    // keeps its live count; only the descriptive record refreshes.
     const herdIds = {};
     for (const h of HERDS) {
       const existing = await c.query(`SELECT id FROM herds WHERE name = $1`, [h.name]);
-      if (existing.rows.length) { herdIds[h.name] = existing.rows[0].id; continue; }
+      if (existing.rows.length) {
+        herdIds[h.name] = existing.rows[0].id;
+        await c.query(
+          `UPDATE herds SET species = $2, breed = $3, location = $4, notes = $5, updated_at = now() WHERE id = $1`,
+          [existing.rows[0].id, h.species, h.breed || null, h.location || null, h.notes || null]);
+        continue;
+      }
       const r = await c.query(
-        `INSERT INTO herds (name, species, head_count) VALUES ($1,$2,$3) RETURNING id`,
-        [h.name, h.species, h.head_count]);
+        `INSERT INTO herds (name, species, head_count, breed, location, notes)
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [h.name, h.species, h.head_count, h.breed || null, h.location || null, h.notes || null]);
       herdIds[h.name] = r.rows[0].id;
+    }
+
+    // Poultry flocks as batches: the anchor entities the per-batch dailies hang off.
+    for (const b of POULTRY_BATCHES) {
+      await c.query(
+        `INSERT INTO batches (species, name, house_location_id, placed_on, placed_count, current_count, stage, purpose)
+         SELECT 'poultry', $1, $2, $3, $4, $5, $6, $7
+         WHERE NOT EXISTS (SELECT 1 FROM batches WHERE name = $1)`,
+        [b.name, locIds[b.house] || null, b.placed_on, b.placed_count, b.current_count, b.stage, b.purpose]);
     }
 
     // Inventory
@@ -125,7 +150,6 @@ export async function seed({ withUsers = true } = {}) {
     await c.query(
       `INSERT INTO farm_settings (key, value) VALUES
          ('absence_mode', '{"active": false}'),
-         ('water_params', '{"tank_usable": 80000, "pool_volume": 45000, "borehole_lph": 6000}'),
          ('irrigation_demand', '{"BLK-A": {"litres_per_plant": 1.2, "emitter_lph": 2.0},
                                  "BLK-B": {"litres_per_day": 7000}}'),
          ('water_balance', '{"enabled": false,
@@ -134,6 +158,13 @@ export async function seed({ withUsers = true } = {}) {
               "BLK-B": {"kc": 1.1, "taw_mm": 90, "mad": 0.5, "area_m2": 2250, "rate_mm_h": 5.0, "efficiency": 0.9}
             }}')
        ON CONFLICT (key) DO NOTHING`);
+
+    // Water system. New keys merge in on re-seed; anything already stored wins,
+    // so a measured TANK_USABLE entered after Phase 0 is never overwritten.
+    await c.query(
+      `INSERT INTO farm_settings (key, value) VALUES ('water_params', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value || farm_settings.value, updated_at = now()`,
+      [JSON.stringify(WATER_SYSTEM)]);
   });
   console.log("seeded");
 }

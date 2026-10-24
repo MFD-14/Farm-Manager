@@ -24,7 +24,7 @@ export async function waterBalance(c, { windowHours = 24 } = {}) {
   };
   const pumpHours = await agg("pump_hours");
   const irrigationL = await agg("irrigation_litres");
-  const stockWaterL = 1500 * (windowHours / 24);
+  const stockWaterL = Number(wp.stock_water_l_per_day || 1500) * (windowHours / 24);
 
   const expectedDeltaL = pumpHours * lph - irrigationL - stockWaterL;
   const deficitL = expectedDeltaL - tankDeltaL;

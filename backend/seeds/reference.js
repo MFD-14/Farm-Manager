@@ -145,19 +145,81 @@ export const ASSETS = [
   { code: "FENCE-W", name: "Fence west section", kind: "fence_section", criticality: "P2" },
 ];
 
+// Woodlands Farm layout (Subdivision 3, 119.2 ha, Kwekwe). Block sizes and
+// soils from the farm field map; stands (plant_count) are planner parameters
+// maintained by C-06/C-09 anchor events (spec 3.5).
 export const LOCATIONS = [
-  { code: "BLK-A", name: "Block A (Irrigated, kale)", kind: "block", crop: "kale", plant_count: 10000, irrigated: true },
-  { code: "BLK-B", name: "Block B (Irrigated, tomato and onion)", kind: "block", crop: "tomato+onion", plant_count: 2500, irrigated: true },
-  { code: "BLK-C", name: "Block C (Dryland maize)", kind: "block", crop: "maize", rainfed_capable: true },
-  { code: "BLK-D", name: "Block D (Dryland maize and butternut)", kind: "block", crop: "maize+butternut", rainfed_capable: true },
+  { code: "BLK-A", name: "Block A (Irrigated, kale)", kind: "block", crop: "kale+rape", plant_count: 10000, irrigated: true, hectares: 12, soil: "Red clay loam" },
+  { code: "BLK-B", name: "Block B (Irrigated, tomato and onion)", kind: "block", crop: "tomato+onion", plant_count: 2500, irrigated: true, hectares: 8, soil: "Sandy loam" },
+  { code: "BLK-C", name: "Block C (Dryland maize)", kind: "block", crop: "maize", rainfed_capable: true, hectares: 35, soil: "Red clay", status: "planted" },
+  { code: "BLK-D", name: "Block D (Dryland maize and butternut)", kind: "block", crop: "maize+butternut", rainfed_capable: true, hectares: 25, soil: "Red clay loam", status: "planted" },
+  { code: "BLK-E", name: "Block E (Fallow)", kind: "block", hectares: 15, soil: "Sandy clay", status: "fallow" },
+  { code: "HOMESTEAD", name: "Homestead Garden", kind: "block", crop: "kale+tomato+onion", irrigated: true, hectares: 2, soil: "Composted loam" },
+  { code: "ORCHARD", name: "Orchard Area", kind: "zone", hectares: 5, soil: "Deep red loam", status: "planned" },
+  { code: "GRAZING", name: "Grazing / Reserve", kind: "paddock", hectares: 17.2, soil: "Mixed", status: "reserve" },
   { code: "NURSERY", name: "Seedbed and nursery", kind: "zone" },
-  { code: "HOUSE-1", name: "Poultry house 1", kind: "house" },
-  { code: "HOUSE-2", name: "Poultry house 2", kind: "house" },
+  { code: "HOUSE-1", name: "Poultry House A", kind: "house" },
+  { code: "HOUSE-2", name: "Poultry House B", kind: "house" },
   { code: "STORE-1", name: "Main store", kind: "store" },
   { code: "PADDOCK-1", name: "Paddock 1", kind: "paddock" },
+  { code: "PADDOCK-2", name: "Paddock 2", kind: "paddock" },
+  { code: "KRAAL-G", name: "Goat kraal", kind: "zone" },
+  { code: "PIGGERY", name: "Piggery", kind: "zone" },
 ];
 
-export const HERDS = [{ name: "Main herd", species: "cattle", head_count: 30 }];
+// Real herd composition. The cattle operate as one 30-head herd for the
+// 90-day rehabilitation programme (spec 2.6) and K-task scheduling; the
+// Brahman/Mashona split and paddocks live on the record.
+export const HERDS = [
+  {
+    name: "Main herd", species: "cattle", head_count: 30,
+    breed: "Brahman 18 + Mashona 12",
+    location: "Paddock 1 (Brahman), Paddock 2 (Mashona)",
+    notes: "Brahman breeding herd: 1 bull, 15 cows, 2 heifers. Mashona indigenous herd, low maintenance. 90-day rehabilitation programme active, target BCS 2.5 to 3.0.",
+  },
+  {
+    name: "Goat herd", species: "goats", head_count: 35,
+    breed: "Boer", location: "Goat kraal",
+    notes: "3 bucks, 25 does, 7 kids.",
+  },
+  {
+    name: "Pig herd", species: "pigs", head_count: 8,
+    breed: "Large White", location: "Piggery",
+    notes: "2 sows, 6 growers.",
+  },
+];
+
+// Active poultry flocks as batches (anchor entities for the S4 chains and the
+// per-batch dailies P-01/P-02/P-04/P-05). Staggered hatching builds toward the
+// 1,000-layer target.
+export const POULTRY_BATCHES = [
+  {
+    name: "Black Australorp layers", house: "HOUSE-1", placed_on: "2026-01-15",
+    placed_count: 250, current_count: 250, stage: "laying", purpose: "layers",
+  },
+  {
+    name: "Sasso broilers (batch 3)", house: "HOUSE-2", placed_on: "2026-05-01",
+    placed_count: 100, current_count: 100, stage: "growing", purpose: "broilers",
+  },
+];
+
+// Water system (spec 3.5, T1). Borehole delivers 6,000 L/h; roughly 6 pumping
+// hours a day gives ~36,000 L/day. The pool is the measured buffer; the main
+// tank's usable volume is a range until Phase 0 rehabilitation measures it, so
+// tank_usable_measured stays false and the low end is used for T1 (safest).
+export const WATER_SYSTEM = {
+  borehole_lph: 6000,
+  pumping_hours_per_day: 6,
+  daily_pump_capacity_l: 36000,
+  pool_volume: 45000,
+  tank_usable: 80000,
+  tank_usable_range: [80000, 125000],
+  tank_usable_measured: false,
+  stock_water_l_per_day: 1500,
+  low_water_trigger_pct: 30,
+  critical_water_trigger_pct: 15,
+  peak_crop_demand_l_per_day: 20500,
+};
 
 export const INVENTORY = [
   { name: "Layers mash", unit: "kg", category: "feed", on_hand: 500, reorder_point: 300, reorder_qty: 500 },

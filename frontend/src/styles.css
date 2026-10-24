@@ -267,6 +267,21 @@ button { font-family:var(--fb); cursor:pointer; }
   color:var(--ts); }
 .wb-table tr:last-child td { border-bottom:none; }
 
+/* ── Farm profile ────────────────────────────────────────── */
+.farm-sub { font-size:13px; color:var(--tm); margin:-10px 2px 14px; }
+.farm-count { font-family:var(--fd); font-size:22px; font-weight:700; color:var(--e8);
+  font-variant-numeric:tabular-nums; line-height:1; }
+.farm-notes { font-size:13px; color:var(--ts); margin-top:8px; line-height:1.5; }
+.farm-block { padding:10px 0; border-bottom:1px solid var(--bl); }
+.farm-block:last-child { border-bottom:none; }
+.farm-block-head { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.farm-block-head .nm { font-size:14px; font-weight:600; }
+.farm-bar { height:8px; border-radius:5px; background:var(--bl); margin:7px 0 5px; overflow:hidden; }
+.farm-bar div { height:100%; border-radius:5px; background:var(--e5); opacity:.55; }
+.farm-bar div[data-irrigated="true"] { background:var(--b5); opacity:.8; }
+.farm-block-meta { display:flex; gap:10px; flex-wrap:wrap; font-size:12px; color:var(--tm); }
+.farm-block-meta b { color:var(--e8); }
+
 /* ── Withholding banner + capture hints ──────────────────── */
 .withhold-banner { background:#fef3c7; border-left:4px solid var(--gold); color:#78350f;
   border-radius:10px; padding:10px 13px; font-size:13px; margin-bottom:10px; line-height:1.5; }

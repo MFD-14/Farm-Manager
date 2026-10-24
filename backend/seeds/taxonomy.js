@@ -113,7 +113,7 @@ export const TEMPLATES = [
     code: "P-04", title: "Egg collection and grading count", domain: "P", priority: "P1", est_minutes: 1,
     subject_type: "batch",
     evidence_policy: E.E1([num("trays", "Trays", 0, 100), num("singles", "Singles", 0, 29)]),
-    schedule: { type: "calendar", freq: "daily", at: ["10:00", "15:00"], fixed: true, per_active_batch: true, batch_age_min_days: 126 },
+    schedule: { type: "calendar", freq: "daily", at: ["10:00", "15:00"], fixed: true, per_active_batch: true, batch_age_min_days: 126, batch_purpose: "layers" },
     readings: [{ metric: "egg_count", from: "trays", transform: "trays_to_eggs" }],
   },
   {

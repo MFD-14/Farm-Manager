@@ -167,6 +167,74 @@ ownerRouter.get("/rain", auth(), async (req, res) => {
   });
 });
 
+// Farm profile: land, livestock, flocks and the water system in one response,
+// with the derived figures an owner reasons from (buffer autonomy, cropped area).
+ownerRouter.get("/farm", auth(), async (req, res) => {
+  const blocks = (await q(
+    `SELECT code, name, kind, crop, plant_count, hectares, soil, status, irrigated
+     FROM locations WHERE hectares IS NOT NULL ORDER BY hectares DESC`)).rows
+    .map((b) => ({ ...b, hectares: Number(b.hectares) }));
+  const herds = (await q(
+    `SELECT name, species, breed, head_count, location, notes FROM herds ORDER BY head_count DESC`)).rows;
+  const flocks = (await q(
+    `SELECT b.name, b.purpose, b.stage, b.placed_on, b.placed_count, b.current_count, l.name AS house
+     FROM batches b LEFT JOIN locations l ON l.id = b.house_location_id
+     WHERE b.stage <> 'closed' ORDER BY b.placed_on`)).rows
+    .map((f) => ({
+      ...f,
+      age_days: f.placed_on ? Math.floor((Date.now() - new Date(f.placed_on).getTime()) / 86_400_000) : null,
+    }));
+  const water = (await q(`SELECT value FROM farm_settings WHERE key = 'water_params'`)).rows[0]?.value || {};
+  const tank = (await q(
+    `SELECT value, taken_at FROM readings WHERE metric = 'tank_level_pct' ORDER BY taken_at DESC LIMIT 1`)).rows[0];
+  const pool = (await q(
+    `SELECT value, taken_at FROM readings WHERE metric = 'pool_level_pct' ORDER BY taken_at DESC LIMIT 1`)).rows[0];
+
+  const buffer = Number(water.pool_volume || 0) + Number(water.tank_usable || 0);
+  const stored = tank || pool
+    ? (Number(tank?.value ?? 0) / 100) * Number(water.tank_usable || 0)
+      + (Number(pool?.value ?? 0) / 100) * Number(water.pool_volume || 0)
+    : null;
+  const demand = Number(water.peak_crop_demand_l_per_day || 0) + Number(water.stock_water_l_per_day || 0);
+  const mapped = blocks.reduce((a, b) => a + b.hectares, 0);
+  const cropped = blocks.filter((b) => ["active", "planted"].includes(b.status))
+    .reduce((a, b) => a + b.hectares, 0);
+
+  res.json({
+    farm: {
+      name: "Woodlands Farm", subdivision: "Subdivision 3",
+      location: "Kwekwe, Midlands Province, Zimbabwe",
+      total_ha: 119.2, mapped_ha: Math.round(mapped * 10) / 10,
+      cropped_ha: Math.round(cropped * 10) / 10,
+      coordinates: { lat: Number(process.env.FARM_LAT || -18.9281), lng: Number(process.env.FARM_LNG || 29.8149) },
+    },
+    blocks,
+    livestock: {
+      herds,
+      flocks,
+      totals: {
+        cattle: herds.filter((h) => h.species === "cattle").reduce((a, h) => a + h.head_count, 0),
+        goats: herds.filter((h) => h.species === "goats").reduce((a, h) => a + h.head_count, 0),
+        pigs: herds.filter((h) => h.species === "pigs").reduce((a, h) => a + h.head_count, 0),
+        poultry: flocks.reduce((a, f) => a + Number(f.current_count || 0), 0),
+      },
+    },
+    water: {
+      ...water,
+      buffer_l: buffer,
+      stored_l: stored === null ? null : Math.round(stored),
+      stored_pct: stored === null || !buffer ? null : Math.round((stored / buffer) * 1000) / 10,
+      // Days the stored buffer covers peak demand if the borehole stops (spec 3.5).
+      autonomy_days: stored === null || !demand ? null : Math.round((stored / demand) * 10) / 10,
+      full_buffer_autonomy_days: demand ? Math.round((buffer / demand) * 10) / 10 : null,
+      pumping_headroom_pct: water.daily_pump_capacity_l && demand
+        ? Math.round((1 - demand / water.daily_pump_capacity_l) * 100) : null,
+      last_tank_reading: tank ? { pct: Number(tank.value), at: tank.taken_at } : null,
+      last_pool_reading: pool ? { pct: Number(pool.value), at: pool.taken_at } : null,
+    },
+  });
+});
+
 ownerRouter.get("/kpis", auth(), async (req, res) => {
   const days = Math.min(365, parseInt(req.query.period || "7", 10) || 7);
   const kpis = await tx((c) => computeKpis(c, { days }));

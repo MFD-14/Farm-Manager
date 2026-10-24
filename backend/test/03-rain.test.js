@@ -106,12 +106,15 @@ test("rain endpoint aggregates weekly and monthly totals", async () => {
 });
 
 test("rain endpoint returns cumulative season-vs-season curves", async () => {
-  // Current season (2025/26 at the frozen test horizon) and previous season.
+  // Readings are placed relative to the current season's 1 October start, so
+  // the test holds on any date of the year.
+  const now = new Date();
+  const startYear = now.getUTCMonth() + 1 >= 10 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+  const inCur = (days) => new Date(Date.UTC(startYear, 9, 1, 8) + days * 86_400_000).toISOString();
+  const inPrev = (days) => new Date(Date.UTC(startYear - 1, 9, 1, 8) + days * 86_400_000).toISOString();
   await q(`INSERT INTO readings (metric, value, taken_at) VALUES
-     ('rain_mm', 10, now()),
-     ('rain_mm', 25, now() - interval '30 days'),
-     ('rain_mm', 40, now() - interval '1 year'),
-     ('rain_mm', 20, now() - interval '1 year' + interval '10 days')`);
+     ('rain_mm', 25, $1), ('rain_mm', 10, $2), ('rain_mm', 40, $3), ('rain_mm', 20, $4)`,
+    [inCur(2), inCur(5), inPrev(30), inPrev(40)]);
   const r = await fetch(base + "/api/owner/rain", {
     headers: { Authorization: `Bearer ${ownerToken}` } }).then((x) => x.json());
   assert.equal(r.seasons.length, 2, "current and previous season present");

@@ -137,11 +137,13 @@ export async function runRelease(c, dateStr, { now = new Date() } = {}) {
         // Batch-scoped dailies (per_active_batch): one instance per qualifying batch.
         if (sched.per_active_batch) {
           const { rows: batches } = await c.query(
-            `SELECT id, name, placed_on FROM batches WHERE stage NOT IN ('closed') AND placed_on IS NOT NULL`);
+            `SELECT id, name, placed_on, purpose FROM batches WHERE stage NOT IN ('closed') AND placed_on IS NOT NULL`);
           for (const b of batches) {
             const age = Math.floor((new Date(dateStr) - new Date(b.placed_on)) / 86_400_000);
             if (sched.batch_age_max_days && age > sched.batch_age_max_days) continue;
             if (sched.batch_age_min_days && age < sched.batch_age_min_days) continue;
+            // A batch with no recorded purpose (placed via P-08) stays eligible.
+            if (sched.batch_purpose && b.purpose && b.purpose !== sched.batch_purpose) continue;
             const { id, inserted } = await createInstance(c, tpl, dateStr, timeStr, {
               subjectType: "batch", subjectId: b.id, assignee,
               title: `${tpl.title} (${b.name})`, periodSuffix: "",

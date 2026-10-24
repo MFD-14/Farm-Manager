@@ -6,6 +6,10 @@ import DayView from "./views/DayView.jsx";
 import OwnerView from "./views/OwnerView.jsx";
 import RainView from "./views/RainView.jsx";
 import WaterView from "./views/WaterView.jsx";
+import FarmView from "./views/FarmView.jsx";
+
+// Barn outline for the Farm tab.
+const FARM_ICON = "M3 21V10l9-6 9 6v11M9 21v-6h6v6M3 21h18";
 import Login from "./views/Login.jsx";
 
 function TabIcon({ d }) {
@@ -84,11 +88,12 @@ export default function App() {
           </span>
         </div>
       </header>
-      {isOwner
-        ? (tab === "rain" ? <RainView /> : tab === "water" ? <WaterView /> : <OwnerView tab={tab} />)
-        : (tab === "rain"
-            ? <RainView onCaptureToday={() => setTab("day")} />
-            : <DayView onCountsChanged={refreshCounts} />)}
+      {tab === "farm" ? <FarmView />
+        : isOwner
+          ? (tab === "rain" ? <RainView /> : tab === "water" ? <WaterView /> : <OwnerView tab={tab} />)
+          : (tab === "rain"
+              ? <RainView onCaptureToday={() => setTab("day")} />
+              : <DayView onCountsChanged={refreshCounts} />)}
       {isOwner ? (
         <nav className="tabs">
           <button className={tab === "day" ? "on" : ""} onClick={() => setTab("day")}>
@@ -106,6 +111,9 @@ export default function App() {
           <button className={tab === "kpis" ? "on" : ""} onClick={() => setTab("kpis")}>
             <TabIcon d="M12 20V10M18 20V4M6 20v-4" />KPIs
           </button>
+          <button className={tab === "farm" ? "on" : ""} onClick={() => setTab("farm")}>
+            <TabIcon d={FARM_ICON} />Farm
+          </button>
         </nav>
       ) : (
         <nav className="tabs">
@@ -114,6 +122,9 @@ export default function App() {
           </button>
           <button className={tab === "rain" ? "on" : ""} onClick={() => setTab("rain")}>
             <TabIcon d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z" />Rain
+          </button>
+          <button className={tab === "farm" ? "on" : ""} onClick={() => setTab("farm")}>
+            <TabIcon d={FARM_ICON} />Farm
           </button>
         </nav>
       )}
