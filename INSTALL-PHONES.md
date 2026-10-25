@@ -8,7 +8,16 @@ it can.
 
 ## 1. Run the server
 
-Any small Linux machine works: a cloud VPS, or a mini PC at the farmhouse.
+**Free option:** [DEPLOY-FREE-CLOUD.md](DEPLOY-FREE-CLOUD.md) walks through a
+free Google Cloud or Oracle Cloud server. One command installs everything,
+HTTPS included:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MFD-14/Farm-Manager/main/scripts/install-server.sh | sudo bash
+```
+
+The same command works on any Ubuntu or Debian VPS. To do it by hand on any
+small Linux machine (a cloud VPS, or a mini PC at the farmhouse):
 
 ```bash
 git clone https://github.com/MFD-14/Farm-Manager.git

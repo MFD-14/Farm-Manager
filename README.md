@@ -15,6 +15,9 @@ core design decision, quoted from the spec:
 
 © 2026 Musara Holdings LLC. All rights reserved. See [LICENSE](LICENSE).
 
+**Server:** free Google Cloud / Oracle Cloud setup with a one-command
+installer in [DEPLOY-FREE-CLOUD.md](DEPLOY-FREE-CLOUD.md).
+
 **Phones:** see [INSTALL-PHONES.md](INSTALL-PHONES.md). Android APK:
 <https://github.com/MFD-14/Farm-Manager/releases/download/android-latest/woodlands.apk>
 (rebuilt automatically on every app change). iPhone: add the server address

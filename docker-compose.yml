@@ -1,5 +1,7 @@
 # One-command deployment: `docker compose up -d`, then open http://<host>:4000
-# For phones away from the farm network, put this behind HTTPS (see DEPLOY.md).
+# With HTTPS for phones (Caddy fetches the certificate for DOMAIN in .env):
+#   docker compose --profile https up -d
+# scripts/install-server.sh does all of this on a fresh cloud server.
 services:
   db:
     image: postgres:16-alpine
@@ -16,6 +18,9 @@ services:
       retries: 10
 
   app:
+    # Prebuilt by .github/workflows/server-image.yml; `docker compose build`
+    # builds it from this checkout instead.
+    image: ${APP_IMAGE:-ghcr.io/mfd-14/farm-manager:latest}
     build: .
     restart: unless-stopped
     depends_on:
@@ -38,6 +43,24 @@ services:
     volumes:
       - media:/data
 
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
 volumes:
   pgdata:
   media:
+  caddy_data:
+  caddy_config:

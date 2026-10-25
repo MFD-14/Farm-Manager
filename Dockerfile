@@ -1,10 +1,13 @@
 # Woodlands Farm Manager: API, scheduler and the installable web app in one
 # image. The phone apps (Android APK, iOS shell) point at wherever this runs.
-FROM node:22-alpine AS web
+# The web bundle is platform-independent, so it always builds natively; only
+# the small runtime stage is built per architecture (amd64 and arm64).
+FROM --platform=$BUILDPLATFORM node:22-alpine AS web
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
+ARG APP_VERSION_NAME
 RUN npm run build
 
 FROM node:22-alpine
