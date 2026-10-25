@@ -12,7 +12,7 @@ async function releaseTemplateNow(c, code, { params = {}, priorityOverride = nul
   if (!t.rows.length) return null;
   const tpl = t.rows[0];
   const user = await c.query(
-    `SELECT id FROM users WHERE role = $1 ORDER BY created_at LIMIT 1`,
+    `SELECT id FROM users WHERE role = $1 AND active ORDER BY created_at LIMIT 1`,
     [assigneeRole || tpl.evidence_policy?.assignee_role || "caretaker"]);
   const dateStr = farmDateStr();
   const periodKey = `${dateStr}:trigger:${randomUUID().slice(0, 8)}`;

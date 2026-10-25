@@ -37,6 +37,25 @@ export function apiUrl(path) {
   return `${serverUrl}${path}`;
 }
 
+// Fired when the server ends this session (password changed or reset, account
+// switched off). Capture keeps queueing; App asks the person to sign in again.
+const unauthorizedListeners = new Set();
+export function onUnauthorized(fn) {
+  unauthorizedListeners.add(fn);
+  return () => unauthorizedListeners.delete(fn);
+}
+
+// Server errors arrive as {"error": "..."}; show the sentence, not the JSON.
+export function errorMessage(err, fallback = "Something went wrong. Try again.") {
+  if (!err) return fallback;
+  if (err.status === 0 || err.name === "TypeError") return "Cannot reach the server. Check your connection.";
+  try {
+    const parsed = JSON.parse(err.message);
+    if (parsed?.error) return parsed.error;
+  } catch { /* not JSON */ }
+  return err.message && err.message !== "unauthorized" ? err.message : fallback;
+}
+
 export async function api(path, { method = "GET", body, raw, headers = {} } = {}) {
   const resp = await fetch(apiUrl(path), {
     method,
@@ -50,8 +69,10 @@ export async function api(path, { method = "GET", body, raw, headers = {} } = {}
   if (resp.status === 401) {
     // Token expiry never blocks capture (spec 6.3): the caller keeps queueing;
     // App shows login when online.
-    const err = new Error("unauthorized");
+    const text = await resp.text().catch(() => "");
+    const err = new Error(text || "unauthorized");
     err.status = 401;
+    if (token && !path.startsWith("/api/auth/login")) unauthorizedListeners.forEach((fn) => fn());
     throw err;
   }
   if (!resp.ok && resp.status !== 308) {

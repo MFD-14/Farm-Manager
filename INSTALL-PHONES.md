@@ -39,8 +39,10 @@ farm.example.com {
 }
 ```
 
-The accounts are `owner@woodlands.farm` and `caretaker@woodlands.farm`, with the
-passwords you set in `.env`.
+The starter accounts are `owner@woodlands.farm` and `caretaker@woodlands.farm`,
+with the passwords you set in `.env`. After signing in, the owner can switch to
+their own email under **My account** (person icon) and add or manage everyone
+else under **People**.
 
 ## 2. Install on Android
 

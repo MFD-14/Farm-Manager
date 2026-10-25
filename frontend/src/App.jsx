@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { loadToken, setToken, apiJson } from "./lib/api.js";
+import { loadToken, setToken, clearToken, apiJson, onUnauthorized } from "./lib/api.js";
 import { metaGet, metaSet, outboxCounts } from "./lib/db.js";
 import { startSyncLoop, onSyncState, pullBundle } from "./lib/sync.js";
 import DayView from "./views/DayView.jsx";
@@ -8,6 +8,8 @@ import RainView from "./views/RainView.jsx";
 import WaterView from "./views/WaterView.jsx";
 import FarmView from "./views/FarmView.jsx";
 import AboutSheet from "./components/AboutSheet.jsx";
+import AccountSheet, { PasswordForm } from "./components/AccountSheet.jsx";
+import PeopleSheet from "./components/PeopleSheet.jsx";
 
 // Barn outline for the Farm tab.
 const FARM_ICON = "M3 21V10l9-6 9 6v11M9 21v-6h6v6M3 21h18";
@@ -28,6 +30,10 @@ export default function App() {
   const [syncing, setSyncing] = useState(false);
   const [tab, setTab] = useState("day");
   const [showAbout, setShowAbout] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
+  const [showPeople, setShowPeople] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const [oneTime, setOneTime] = useState(""); // kept in memory only
 
   const refreshCounts = useCallback(async () => setCounts(await outboxCounts()), []);
 
@@ -38,14 +44,29 @@ export default function App() {
       if (cached) setUser(cached);
       setReady(true);
       startSyncLoop();
+      // Pick up changes the owner made to this account (role, name, email).
+      if (cached) {
+        apiJson("/api/auth/me").then(async (r) => {
+          if (r.user) { await metaSet("user", r.user); setUser(r.user); }
+        }).catch(() => {});
+      }
     })();
+    // Password changed or reset, or account switched off: ask for sign-in
+    // again. The outbox stays on the phone and drains after sign-in.
+    const offAuth = onUnauthorized(async () => {
+      await clearToken();
+      await metaSet("user", null);
+      setUser(null);
+      setShowAccount(false); setShowPeople(false);
+      setNotice("You've been signed out. Sign in again; anything not yet synced is kept on this phone.");
+    });
     const on = () => setOnline(true);
     const off = () => setOnline(false);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
     const unsub = onSyncState((s) => { setSyncing(s.syncing); refreshCounts(); });
     const iv = setInterval(refreshCounts, 5000);
-    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); unsub(); clearInterval(iv); };
+    return () => { offAuth(); window.removeEventListener("online", on); window.removeEventListener("offline", off); unsub(); clearInterval(iv); };
   }, [refreshCounts]);
 
   async function handleLogin(email, password) {
@@ -58,12 +79,42 @@ export default function App() {
       await metaSet("device_id", reg.device_id);
     } catch { /* keep user token */ }
     await metaSet("user", r.user);
+    setOneTime(r.user.must_change_password ? password : "");
+    setNotice(null);
     setUser(r.user);
     if (r.user.role !== "owner") await pullBundle().catch(() => {});
   }
 
+  async function updateUser(u) {
+    await metaSet("user", u);
+    setUser(u);
+  }
+
+  async function signOut() {
+    await clearToken();
+    await metaSet("user", null);
+    await metaSet("device_id", null);
+    setShowAccount(false); setShowPeople(false);
+    setTab("day");
+    setUser(null);
+  }
+
   if (!ready) return null;
-  if (!user) return <Login onLogin={handleLogin} />;
+  if (!user) return <Login onLogin={handleLogin} notice={notice} />;
+
+  // First sign-in with a one-time password from the owner: choose your own.
+  if (user.must_change_password) {
+    return (
+      <div className="login">
+        <h1>Choose your password</h1>
+        <div className="tagline">
+          Hello {user.name}. You signed in with a one-time password; pick your own to keep using Woodlands.
+        </div>
+        <PasswordForm forced initialCurrent={oneTime} onDone={(u) => { setOneTime(""); updateUser(u); }} />
+        <button type="button" className="link-btn" onClick={signOut}>Sign out</button>
+      </div>
+    );
+  }
 
   const pending = counts.events + counts.media;
   const isOwner = user.role === "owner";
@@ -88,6 +139,11 @@ export default function App() {
           <span className={`badge ${pending ? "sync-pending" : "sync-ok"}`}>
             {syncing ? "syncing…" : pending ? `${pending} unsynced` : "synced"}
           </span>
+          <button className="about-btn" aria-label="My account" onClick={() => setShowAccount(true)}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" />
+            </svg>
+          </button>
           <button className="about-btn" aria-label="About Woodlands" onClick={() => setShowAbout(true)}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
@@ -96,6 +152,12 @@ export default function App() {
         </div>
       </header>
       {showAbout && <AboutSheet user={user} onClose={() => setShowAbout(false)} />}
+      {showAccount && (
+        <AccountSheet user={user} pending={pending} onClose={() => setShowAccount(false)}
+          onUserChanged={updateUser} onSignOut={signOut}
+          onOpenPeople={() => { setShowAccount(false); setShowPeople(true); }} />
+      )}
+      {showPeople && <PeopleSheet onClose={() => setShowPeople(false)} />}
       {tab === "farm" ? <FarmView />
         : isOwner
           ? (tab === "rain" ? <RainView /> : tab === "water" ? <WaterView /> : <OwnerView tab={tab} />)

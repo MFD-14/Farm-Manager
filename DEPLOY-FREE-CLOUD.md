@@ -155,6 +155,23 @@ then tap Share → **Add to Home Screen**.
 
 **Computer:** the same address works in any browser.
 
+## Use your own email
+
+1. Sign in as `owner@woodlands.farm`, then tap the **person icon** at the top
+   right to open **My account**.
+2. Change **Sign-in email** to your own address, type the current password, and
+   tap **Save profile**. From now on you sign in with your email.
+3. Under **Password**, choose a password of your own.
+4. Tap **People** (top of My account) to manage everyone else. **Edit** the
+   caretaker to give them their real name and email, or **+ Add a person**.
+   Leaving the password blank creates a one-time password to send them; they
+   choose their own at first sign-in.
+
+People can't be deleted, because the farm history records who did each task.
+Use **Switch off** instead: that person can no longer sign in and is signed out
+on every phone. **New password** gives someone a fresh one-time password if
+they forget theirs.
+
 ---
 
 ## Looking after the server
@@ -169,8 +186,9 @@ again. Data, settings and passwords are kept.
 sudo grep PASSWORD /opt/woodlands/.env
 ```
 
-Changing `OWNER_PASSWORD` or `CARETAKER_PASSWORD` in `.env` later doesn't change
-an existing account; the file only sets the password the first time.
+These are only the first passwords. Once changed in the app, the app's password
+is the one that works; editing `.env` later doesn't change it. If the owner is
+locked out, another owner can give them a new password under **People**.
 
 **Back up the farm records:**
 

@@ -130,7 +130,11 @@ npm run build                 # production PWA in dist/
 ```
 
 Seeded users: `owner@woodlands.farm` / `caretaker@woodlands.farm`, password
-`woodlands` (change in production).
+`woodlands` (or `OWNER_PASSWORD` / `CARETAKER_PASSWORD`). Accounts are managed in
+the app: everyone edits their own email and password under **My account**;
+owners add people, issue one-time passwords and switch accounts off under
+**People** (`/api/users`). Password changes, resets and deactivation end
+existing sessions on every phone.
 
 ```bash
 cd backend

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { getServerUrl, setServerUrl, isNativeShell } from "../lib/api.js";
+import { getServerUrl, setServerUrl, isNativeShell, errorMessage } from "../lib/api.js";
 import AboutSheet, { COPYRIGHT } from "../components/AboutSheet.jsx";
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, notice }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [server, setServer] = useState("");
@@ -27,8 +27,10 @@ export default function Login({ onLogin }) {
       if (showServer || native) await setServerUrl(server);
       await onLogin(email.trim(), password);
     } catch (e2) {
-      setErr(e2.status === 401 ? "Wrong email or password" : "Cannot reach the server. Check the server address.");
-      if (e2.status !== 401) setShowServer(true);
+      setErr(e2.status === 401 ? "Wrong email or password"
+        : e2.status === 403 ? errorMessage(e2)
+        : "Cannot reach the server. Check the server address.");
+      if (e2.status !== 401 && e2.status !== 403) setShowServer(true);
     } finally {
       setBusy(false);
     }
@@ -46,6 +48,7 @@ export default function Login({ onLogin }) {
       </div>
       <h1>Woodlands Farm Manager</h1>
       <div className="tagline">119.2 ha · Kwekwe, Midlands Province</div>
+      {notice && <p className="form-msg bad">{notice}</p>}
       {showServer && (
         <div className="field">
           <label>Server address</label>

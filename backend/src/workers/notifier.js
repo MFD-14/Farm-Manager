@@ -6,7 +6,7 @@ import { sendWhatsApp } from "./whatsappSender.js";
 
 export async function notify(c, { channel, to, rung, instanceId = null, body = {} }) {
   const user = await c.query(
-    `SELECT id, phone FROM users WHERE role = $1 ORDER BY created_at LIMIT 1`, [to === "owner" ? "owner" : "caretaker"]);
+    `SELECT id, phone FROM users WHERE role = $1 AND active ORDER BY created_at LIMIT 1`, [to === "owner" ? "owner" : "caretaker"]);
   const recipient = user.rows[0]?.phone || to;
 
   await c.query(

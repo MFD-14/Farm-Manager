@@ -11,11 +11,11 @@ import { foldEvent } from "./fold.js";
 const PRIORITY_ORDER = { P0: 0, P1: 1, P2: 2, P3: 3 };
 
 async function caretakerId(c) {
-  const r = await c.query(`SELECT id FROM users WHERE role = 'caretaker' ORDER BY created_at LIMIT 1`);
+  const r = await c.query(`SELECT id FROM users WHERE role = 'caretaker' AND active ORDER BY created_at LIMIT 1`);
   return r.rows[0]?.id || null;
 }
 async function ownerId(c) {
-  const r = await c.query(`SELECT id FROM users WHERE role = 'owner' ORDER BY created_at LIMIT 1`);
+  const r = await c.query(`SELECT id FROM users WHERE role = 'owner' AND active ORDER BY created_at LIMIT 1`);
   return r.rows[0]?.id || null;
 }
 

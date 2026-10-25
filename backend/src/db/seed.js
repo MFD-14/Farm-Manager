@@ -21,19 +21,23 @@ export async function seed({ withUsers = true } = {}) {
       if (process.env.NODE_ENV === "production" && (!process.env.OWNER_PASSWORD || !process.env.CARETAKER_PASSWORD)) {
         console.warn("WARNING: OWNER_PASSWORD / CARETAKER_PASSWORD not set; new accounts use the demo password.");
       }
-      const or = await c.query(
-        `INSERT INTO users (email, password_hash, name, role, phone)
-         VALUES ('owner@woodlands.farm', $1, 'Owner', 'owner', '+263770000001')
-         ON CONFLICT (email) DO UPDATE SET updated_at = now() RETURNING id`, [ownerHash]);
-      owner = or.rows[0].id;
-      const cr = await c.query(
-        `INSERT INTO users (email, password_hash, name, role, phone)
-         VALUES ('caretaker@woodlands.farm', $1, 'Caretaker', 'caretaker', '+263770000002')
-         ON CONFLICT (email) DO UPDATE SET updated_at = now() RETURNING id`, [careHash]);
-      caretaker = cr.rows[0].id;
-      await c.query(
-        `INSERT INTO wa_contacts (user_id, wa_phone) VALUES ($1,'+263770000001'), ($2,'+263770000002')
-         ON CONFLICT (wa_phone) DO NOTHING`, [owner, caretaker]);
+      // The starter accounts are found by role, not email, so an owner who
+      // renames their account to their own address doesn't get the starter
+      // account back on the next restart.
+      const starter = async (role, email, name, phone, hash) => {
+        const existing = await c.query(
+          `SELECT id FROM users WHERE role = $1 ORDER BY active DESC, created_at LIMIT 1`, [role]);
+        if (existing.rows[0]) return existing.rows[0].id;
+        const r = await c.query(
+          `INSERT INTO users (email, password_hash, name, role, phone)
+           VALUES ($1, $2, $3, $4, $5) RETURNING id`, [email, hash, name, role, phone]);
+        await c.query(
+          `INSERT INTO wa_contacts (user_id, wa_phone) VALUES ($1, $2) ON CONFLICT (wa_phone) DO NOTHING`,
+          [r.rows[0].id, phone]);
+        return r.rows[0].id;
+      };
+      owner = await starter("owner", "owner@woodlands.farm", "Owner", "+263770000001", ownerHash);
+      caretaker = await starter("caretaker", "caretaker@woodlands.farm", "Caretaker", "+263770000002", careHash);
     }
 
     // Escalation profiles

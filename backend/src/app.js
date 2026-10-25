@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { authRouter } from "./routes/auth.js";
+import { usersRouter } from "./routes/users.js";
 import { syncRouter } from "./routes/sync.js";
 import { mediaRouter } from "./routes/media.js";
 import { planRouter, instancesRouter } from "./routes/instances.js";
@@ -41,6 +42,7 @@ export function createApp() {
   app.get("/api/health", (req, res) => res.json({ ok: true, service: "wfm-backend" }));
 
   app.use("/api/auth", authRouter);
+  app.use("/api/users", usersRouter);
   app.use("/api/sync", syncRouter);
   app.use("/api/media", mediaRouter);
   app.use("/api/plan", planRouter);

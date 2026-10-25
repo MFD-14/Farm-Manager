@@ -45,7 +45,7 @@ async function fireRung(c, instance, rung, absence) {
     for (const channel of rung.channels || []) {
       if (channel === "local") continue; // mirrored client-side from the cached plan
       if (channel === "whatsapp" && rung.buttons && to === "caretaker") {
-        const u = await c.query(`SELECT phone FROM users WHERE role = 'caretaker' ORDER BY created_at LIMIT 1`);
+        const u = await c.query(`SELECT phone FROM users WHERE role = 'caretaker' AND active ORDER BY created_at LIMIT 1`);
         if (u.rows[0]?.phone) await sendTaskButtons(c, { toPhone: u.rows[0].phone, instance });
         await c.query(
           `INSERT INTO notifications_log (channel, rung, instance_id, recipient, body)
