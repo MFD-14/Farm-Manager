@@ -25,17 +25,28 @@ after(() => server?.close());
 const farm = () => fetch(`${base}/api/owner/farm`, { headers: { Authorization: `Bearer ${token}` } })
   .then((r) => r.json());
 
-test("block layout maps the full 119.2 ha title area", async () => {
+test("land use: 2 ha homestead garden in use, the rest to clear, 5 ha lost to mining", async () => {
   const f = await farm();
   assert.equal(f.farm.total_ha, 119.2);
-  assert.equal(f.farm.mapped_ha, 119.2, "every hectare is assigned to a block");
-  assert.equal(f.blocks.length, 8);
-  const c = f.blocks.find((b) => b.code === "BLK-C");
-  assert.equal(c.hectares, 35);
-  assert.equal(c.soil, "Red clay");
-  assert.equal(c.status, "planted");
-  // Active + planted: A 12, B 8, C 35, D 25, Homestead 2
-  assert.equal(f.farm.cropped_ha, 82);
+  assert.equal(f.farm.mapped_ha, 119.2, "every hectare is accounted for");
+  assert.deepEqual(f.blocks.map((b) => [b.code, b.hectares, b.status]), [
+    ["UNCLEARED", 112.2, "to clear"],
+    ["MINING", 5, "lost"],
+    ["HOMESTEAD", 2, "active"],
+  ]);
+  assert.equal(f.farm.cropped_ha, 2, "only the homestead garden is cropped");
+});
+
+test("retired field-map blocks leave the irrigation planner; maize tasks are off once", async () => {
+  const irrigated = (await q(`SELECT code FROM locations WHERE kind = 'block' AND irrigated ORDER BY code`)).rows;
+  assert.deepEqual(irrigated.map((r) => r.code), ["BLK-A", "BLK-B"], "homestead beds only");
+  const off = (await q(`SELECT code, active FROM task_templates WHERE code IN ('C-04', 'C-09') ORDER BY code`)).rows;
+  assert.deepEqual(off.map((r) => r.active), [false, false]);
+  // An owner switching one back on survives the next restart's seed.
+  await q(`UPDATE task_templates SET active = true WHERE code = 'C-04'`);
+  await seed({ withUsers: false });
+  assert.equal((await q(`SELECT active FROM task_templates WHERE code = 'C-04'`)).rows[0].active, true);
+  await q(`UPDATE task_templates SET active = false WHERE code = 'C-04'`);
 });
 
 test("livestock: cattle herd split, goats, pigs and both poultry flocks", async () => {

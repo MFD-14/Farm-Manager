@@ -5,7 +5,9 @@ import React, { useEffect, useState } from "react";
 import { apiJson } from "../lib/api.js";
 import { metaGet, metaSet } from "../lib/db.js";
 
-const STATUS_CHIP = { active: "state-verified_closed", planted: "P2", fallow: "P3", planned: "state-released", reserve: "P3" };
+const STATUS_CHIP = { active: "state-verified_closed", planted: "P2", fallow: "P3", planned: "state-released", reserve: "P3",
+  "to clear": "state-released", lost: "P1" };
+const STATUS_LABEL = { active: "in use" };
 const SPECIES_LABEL = { cattle: "Cattle", goats: "Goats", pigs: "Pigs" };
 
 export default function FarmView() {
@@ -103,18 +105,19 @@ export default function FarmView() {
         </div>
       ))}
 
-      <div className="section-title">Land · {farm.mapped_ha} of {farm.total_ha} ha mapped</div>
+      <div className="section-title">Land · {farm.cropped_ha} of {farm.total_ha} ha in use</div>
       <div className="card">
         {blocks.map((b) => (
           <div className="farm-block" key={b.code}>
             <div className="farm-block-head">
               <span className="nm">{b.name}</span>
-              <span className={`chip ${STATUS_CHIP[b.status] || "P3"}`}>{b.status}</span>
+              <span className={`chip ${STATUS_CHIP[b.status] || "P3"}`}>{STATUS_LABEL[b.status] || b.status}</span>
             </div>
             <div className="farm-bar"><div style={{ width: `${(b.hectares / maxHa) * 100}%` }} data-irrigated={b.irrigated} /></div>
             <div className="farm-block-meta">
               <span><b>{b.hectares} ha</b></span>
-              <span>{b.soil}</span>
+              {b.crop && <span>{b.crop}</span>}
+              {b.soil && <span>{b.soil}</span>}
               {b.plant_count && <span>{b.plant_count.toLocaleString()} plants</span>}
               {b.irrigated && <span>irrigated</span>}
             </div>

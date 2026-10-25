@@ -147,6 +147,17 @@ export async function seed({ withUsers = true } = {}) {
         ]);
     }
 
+    // One-time land-use change (Oct 2026): no maize or sorghum is grown, so the
+    // maize scout and maize/sorghum planting tasks are switched off once. The
+    // marker stops later restarts undoing an owner who switches them back on.
+    const landUse = await c.query(`SELECT 1 FROM farm_settings WHERE key = 'land_use_2026_10'`);
+    if (!landUse.rows.length) {
+      await c.query(`UPDATE task_templates SET active = false WHERE code IN ('C-04', 'C-09')`);
+      await c.query(
+        `INSERT INTO farm_settings (key, value) VALUES ('land_use_2026_10', $1)`,
+        [JSON.stringify({ applied_at: new Date().toISOString(), deactivated: ["C-04", "C-09"] })]);
+    }
+
     // Rules
     for (const r of RULES) {
       await c.query(

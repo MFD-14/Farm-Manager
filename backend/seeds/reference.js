@@ -149,14 +149,24 @@ export const ASSETS = [
 // soils from the farm field map; stands (plant_count) are planner parameters
 // maintained by C-06/C-09 anchor events (spec 3.5).
 export const LOCATIONS = [
-  { code: "BLK-A", name: "Block A (Irrigated, kale)", kind: "block", crop: "kale+rape", plant_count: 10000, irrigated: true, hectares: 12, soil: "Red clay loam" },
-  { code: "BLK-B", name: "Block B (Irrigated, tomato and onion)", kind: "block", crop: "tomato+onion", plant_count: 2500, irrigated: true, hectares: 8, soil: "Sandy loam" },
-  { code: "BLK-C", name: "Block C (Dryland maize)", kind: "block", crop: "maize", rainfed_capable: true, hectares: 35, soil: "Red clay", status: "planted" },
-  { code: "BLK-D", name: "Block D (Dryland maize and butternut)", kind: "block", crop: "maize+butternut", rainfed_capable: true, hectares: 25, soil: "Red clay loam", status: "planted" },
-  { code: "BLK-E", name: "Block E (Fallow)", kind: "block", hectares: 15, soil: "Sandy clay", status: "fallow" },
-  { code: "HOMESTEAD", name: "Homestead Garden", kind: "block", crop: "kale+tomato+onion", irrigated: true, hectares: 2, soil: "Composted loam" },
-  { code: "ORCHARD", name: "Orchard Area", kind: "zone", hectares: 5, soil: "Deep red loam", status: "planned" },
-  { code: "GRAZING", name: "Grazing / Reserve", kind: "paddock", hectares: 17.2, soil: "Mixed", status: "reserve" },
+  // Land use (owner, Oct 2026): the 2 ha homestead garden is the only land in
+  // use (crop split to follow); about 5 ha is lost to mining; the rest is to be
+  // cleared and may be grazed meanwhile. 2 + 112.2 + 5 = 119.2 ha.
+  { code: "HOMESTEAD", name: "Homestead garden", kind: "zone", crop: "kale, rape, tomato, onion (split to follow)", irrigated: true, hectares: 2, soil: "Composted loam", status: "active" },
+  { code: "UNCLEARED", name: "Land to clear (grazing meanwhile)", kind: "paddock", hectares: 112.2, soil: "Mixed", status: "to clear" },
+  { code: "MINING", name: "Lost to mining activity", kind: "zone", hectares: 5, status: "lost" },
+  // Beds inside the homestead garden. They keep their codes because tasks
+  // (C-01 kale harvest, C-05 scouting) and the irrigation planner refer to them;
+  // their area is part of the homestead's 2 ha.
+  { code: "BLK-A", name: "Homestead garden: kale and rape beds", kind: "block", crop: "kale+rape", plant_count: 10000, irrigated: true, soil: "Composted loam" },
+  { code: "BLK-B", name: "Homestead garden: tomato and onion beds", kind: "block", crop: "tomato+onion", plant_count: 2500, irrigated: true, soil: "Composted loam" },
+  // Earlier field-map blocks not in use. Kept (old records point at them) but
+  // retired: no area, no crop, out of the irrigation planner.
+  { code: "BLK-C", name: "Block C (retired)", kind: "block", status: "retired" },
+  { code: "BLK-D", name: "Block D (retired)", kind: "block", status: "retired" },
+  { code: "BLK-E", name: "Block E (retired)", kind: "block", status: "retired" },
+  { code: "ORCHARD", name: "Orchard area (retired)", kind: "zone", status: "retired" },
+  { code: "GRAZING", name: "Grazing reserve (retired)", kind: "paddock", status: "retired" },
   { code: "NURSERY", name: "Seedbed and nursery", kind: "zone" },
   { code: "HOUSE-1", name: "Poultry House A", kind: "house" },
   { code: "HOUSE-2", name: "Poultry House B", kind: "house" },

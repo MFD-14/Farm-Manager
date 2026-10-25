@@ -83,7 +83,8 @@ test("Herdwatch: active PHI window appears in digest and sync bundle with countd
   const bundle = await fetch(`${base}/api/sync/bundle`, {
     headers: { Authorization: `Bearer ${careToken}` } }).then((r) => r.json());
   assert.equal(bundle.active_windows.length, 1);
-  assert.equal(bundle.active_windows[0].subject_name, "Block C (Dryland maize)");
+  const blkC = (await q(`SELECT name FROM locations WHERE code = 'BLK-C'`)).rows[0];
+  assert.equal(bundle.active_windows[0].subject_name, blkC.name);
 });
 
 test("AgriWebb: bundle carries last recorded values per template", async () => {

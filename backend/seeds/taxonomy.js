@@ -297,7 +297,7 @@ export const TEMPLATES = [
     anchor_emit: "nursery_transplanted",
   },
   {
-    code: "C-11", title: "Harvest: tomato, onion, sorghum, maize", domain: "C", priority: "P1", est_minutes: 2,
+    code: "C-11", title: "Harvest: tomato and onion", domain: "C", priority: "P1", est_minutes: 2,
     subject_type: "location",
     evidence_policy: E.E1E2([num("quantity", "Quantity", 0, 100000), text("grade", "Grade")]),
     schedule: null, // from anchor chains
