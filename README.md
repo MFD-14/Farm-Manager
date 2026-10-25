@@ -13,6 +13,8 @@ core design decision, quoted from the spec:
 > escalation, dashboards and KPIs — is a server-side fold over that append-only
 > event log.
 
+© 2026 Musara Holdings LLC. All rights reserved. See [LICENSE](LICENSE).
+
 **Phones:** see [INSTALL-PHONES.md](INSTALL-PHONES.md). Android APK:
 <https://github.com/MFD-14/Farm-Manager/releases/download/android-latest/woodlands.apk>
 (rebuilt automatically on every app change). iPhone: add the server address

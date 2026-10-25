@@ -43,6 +43,8 @@
       </array>
     </dict>
 	</dict>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 Musara Holdings LLC. All rights reserved.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take evidence photos and videos for farm tasks, such as the tank gauge or a harvest count.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

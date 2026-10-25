@@ -1,8 +1,15 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+import { readFileSync } from "node:fs";
+
+const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
 export default defineConfig({
+  // Shown on the About screen; CI sets APP_VERSION_NAME to include the build number.
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.APP_VERSION_NAME || pkg.version),
+  },
   plugins: [
     react(),
     VitePWA({
@@ -10,7 +17,7 @@ export default defineConfig({
       manifest: {
         name: "Woodlands Farm Manager",
         short_name: "Woodlands",
-        description: "Offline-first farm operations: tasks, evidence, verification",
+        description: "Offline-first farm operations: tasks, evidence, verification. © 2026 Musara Holdings LLC.",
         theme_color: "#1a5c2e",
         background_color: "#f7f3ed",
         display: "standalone",

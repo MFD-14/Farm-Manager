@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getServerUrl, setServerUrl, isNativeShell } from "../lib/api.js";
+import AboutSheet, { COPYRIGHT } from "../components/AboutSheet.jsx";
 
 export default function Login({ onLogin }) {
   const [email, setEmail] = useState("");
@@ -8,6 +9,7 @@ export default function Login({ onLogin }) {
   const [showServer, setShowServer] = useState(false);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const native = isNativeShell();
 
   useEffect(() => {
@@ -69,6 +71,10 @@ export default function Login({ onLogin }) {
           Change server address
         </button>
       )}
+      <button type="button" className="login-copyright" onClick={() => setShowAbout(true)}>
+        {COPYRIGHT}
+      </button>
+      {showAbout && <AboutSheet onClose={() => setShowAbout(false)} />}
     </form>
   );
 }

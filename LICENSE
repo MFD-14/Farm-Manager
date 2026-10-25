@@ -1,0 +1,16 @@
+Copyright © 2026 Musara Holdings LLC. All rights reserved.
+
+Woodlands Farm Manager, including its source code, design, task templates,
+specification and documentation, is the property of Musara Holdings LLC.
+
+No part of this software or its documentation may be copied, modified,
+distributed, sublicensed or used to create derivative works without prior
+written permission from Musara Holdings LLC. Access to this repository does not
+grant any licence.
+
+Third-party components are used under their own licences, which remain with
+their respective owners, including:
+- Weather data from Open-Meteo.com, licensed under CC BY 4.0
+- DM Sans and Fraunces typefaces, licensed under the SIL Open Font License 1.1
+- Open-source packages listed in backend/package.json and frontend/package.json,
+  each under its own licence

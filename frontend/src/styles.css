@@ -270,6 +270,29 @@ button { font-family:var(--fb); cursor:pointer; }
 .link-btn { display:block; margin:14px auto 0; background:none; border:none; color:var(--tm);
   font-size:13px; text-decoration:underline; text-underline-offset:3px; }
 
+/* ── About ───────────────────────────────────────────────── */
+.about-btn { width:32px; height:32px; border-radius:50%; border:1px solid rgba(255,255,255,.2);
+  background:rgba(255,255,255,.06); color:#cfc6b8; display:flex; align-items:center;
+  justify-content:center; padding:0; }
+.about-btn:active { background:rgba(255,255,255,.14); }
+.about-mark { width:52px; height:52px; border-radius:15px; background:var(--g7);
+  display:flex; align-items:center; justify-content:center; margin-bottom:12px;
+  box-shadow:0 4px 14px rgba(26,92,46,.3), inset 0 -2px 0 rgba(0,0,0,.2); }
+.about-owner { background:var(--sf); border:1px solid var(--bd); border-left:4px solid var(--gold);
+  border-radius:12px; padding:12px 14px; margin:4px 0 12px; }
+.about-owner-label { font-size:10.5px; font-weight:700; text-transform:uppercase;
+  letter-spacing:1.2px; color:var(--tm); }
+.about-owner-name { font-family:var(--fd); font-size:20px; font-weight:700; color:var(--e8);
+  margin-top:2px; }
+.about-text { font-size:13.5px; color:var(--ts); line-height:1.6; }
+.about-text.small { font-size:12.5px; color:var(--tm); }
+.about-text a { color:var(--g7); }
+.about-wrap { word-break:break-all; text-align:right; font-weight:600; font-size:13px; }
+.about-copyright { text-align:center; font-size:12.5px; font-weight:600; color:var(--e8);
+  margin:20px 0 4px; }
+.login-copyright { display:block; margin:28px auto 0; background:none; border:none;
+  color:var(--tm); font-size:11.5px; }
+
 /* Native shells draw under the status bar and home indicator. */
 .topbar { padding-top:calc(13px + env(safe-area-inset-top)); }
 

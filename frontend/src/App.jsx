@@ -7,6 +7,7 @@ import OwnerView from "./views/OwnerView.jsx";
 import RainView from "./views/RainView.jsx";
 import WaterView from "./views/WaterView.jsx";
 import FarmView from "./views/FarmView.jsx";
+import AboutSheet from "./components/AboutSheet.jsx";
 
 // Barn outline for the Farm tab.
 const FARM_ICON = "M3 21V10l9-6 9 6v11M9 21v-6h6v6M3 21h18";
@@ -26,6 +27,7 @@ export default function App() {
   const [online, setOnline] = useState(navigator.onLine);
   const [syncing, setSyncing] = useState(false);
   const [tab, setTab] = useState("day");
+  const [showAbout, setShowAbout] = useState(false);
 
   const refreshCounts = useCallback(async () => setCounts(await outboxCounts()), []);
 
@@ -81,13 +83,19 @@ export default function App() {
             <div className="sub">{isOwner ? "Owner console" : "Farm Manager"}</div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {!online && <span className="badge offline">offline</span>}
           <span className={`badge ${pending ? "sync-pending" : "sync-ok"}`}>
             {syncing ? "syncing…" : pending ? `${pending} unsynced` : "synced"}
           </span>
+          <button className="about-btn" aria-label="About Woodlands" onClick={() => setShowAbout(true)}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
+            </svg>
+          </button>
         </div>
       </header>
+      {showAbout && <AboutSheet user={user} onClose={() => setShowAbout(false)} />}
       {tab === "farm" ? <FarmView />
         : isOwner
           ? (tab === "rain" ? <RainView /> : tab === "water" ? <WaterView /> : <OwnerView tab={tab} />)

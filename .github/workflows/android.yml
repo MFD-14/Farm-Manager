@@ -40,6 +40,8 @@ jobs:
           cache: gradle
 
       - name: Install and build web bundle
+        env:
+          APP_VERSION_NAME: 1.2.${{ github.run_number }}
         run: |
           npm ci
           npm run build
