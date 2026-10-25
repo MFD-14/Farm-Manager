@@ -88,7 +88,7 @@ function PersonForm({ initial, isMe, onSaved, onCancel }) {
         <label>Role</label>
         <select value={f.role} onChange={set("role")} disabled={isMe}>
           <option value="caretaker">Caretaker: daily tasks and evidence</option>
-          <option value="owner">Owner: everything, including People</option>
+          <option value="owner">Owner (admin): everything, including People</option>
         </select>
       </div>
       <div className="field">
@@ -111,7 +111,7 @@ function PersonForm({ initial, isMe, onSaved, onCancel }) {
   );
 }
 
-export default function PeopleSheet({ onClose }) {
+export default function PeopleSheet({ onClose, onPendingChanged }) {
   const [people, setPeople] = useState(null);
   const [err, setErr] = useState(null);
   const [mode, setMode] = useState(null); // null | "add" | person id being edited
@@ -135,6 +135,9 @@ export default function PeopleSheet({ onClose }) {
       if (action === "reset") {
         const r = await apiJson(`/api/users/${person.id}/reset-password`, { method: "POST" });
         setOtp({ person: r.user, password: r.temp_password });
+      } else if (action === "approve" || action === "decline") {
+        await apiJson(`/api/users/${person.id}/${action}`, { method: "POST" });
+        onPendingChanged?.();
       } else {
         await apiJson(`/api/users/${person.id}`, { method: "PATCH", body: { active: action === "on" } });
       }
@@ -166,7 +169,27 @@ export default function PeopleSheet({ onClose }) {
           : !otp && <button type="button" className="btn primary block" onClick={() => setMode("add")}>+ Add a person</button>}
 
         {!people && !err && <div className="empty">Loading…</div>}
-        {people?.map((p) => (
+        {people?.map((p) => p.pending_approval ? (
+          <div key={p.id} className="card person pending">
+            <div className="person-head">
+              <div>
+                <div className="person-name">{p.name}</div>
+                <div className="person-email">{p.email}{p.phone ? ` · ${p.phone}` : ""}</div>
+              </div>
+              <span className="chip role-pending">Waiting</span>
+            </div>
+            <div className="person-meta">Created their own account on {new Date(p.created_at).toLocaleDateString()}.
+              Approve only if you know this person; they'll join as a caretaker.</div>
+            <div className="person-actions">
+              <button type="button" className="btn primary" disabled={busyId === p.id} onClick={() => act(p, "approve")}>
+                Approve
+              </button>
+              <button type="button" className="btn ghost" disabled={busyId === p.id} onClick={() => act(p, "decline")}>
+                Decline
+              </button>
+            </div>
+          </div>
+        ) : (
           <div key={p.id} className={`card person ${p.active ? "" : "off"}`}>
             {mode === p.id ? (
               <PersonForm initial={p} isMe={p.is_me} onSaved={saved} onCancel={() => setMode(null)} />

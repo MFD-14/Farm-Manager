@@ -34,6 +34,7 @@ export default function App() {
   const [showPeople, setShowPeople] = useState(false);
   const [notice, setNotice] = useState(null);
   const [oneTime, setOneTime] = useState(""); // kept in memory only
+  const [waiting, setWaiting] = useState(0); // sign-ups awaiting an owner
 
   const refreshCounts = useCallback(async () => setCounts(await outboxCounts()), []);
 
@@ -84,6 +85,17 @@ export default function App() {
     setUser(r.user);
     if (r.user.role !== "owner") await pullBundle().catch(() => {});
   }
+
+  // Owners see a dot on the account button when someone has signed up.
+  const refreshWaiting = useCallback(async () => {
+    try { setWaiting((await apiJson("/api/users/pending-count")).count); } catch { /* offline */ }
+  }, []);
+  useEffect(() => {
+    if (user?.role !== "owner") return undefined;
+    refreshWaiting();
+    const iv = setInterval(refreshWaiting, 120000);
+    return () => clearInterval(iv);
+  }, [user?.role, refreshWaiting]);
 
   async function updateUser(u) {
     await metaSet("user", u);
@@ -139,7 +151,9 @@ export default function App() {
           <span className={`badge ${pending ? "sync-pending" : "sync-ok"}`}>
             {syncing ? "syncing…" : pending ? `${pending} unsynced` : "synced"}
           </span>
-          <button className="about-btn" aria-label="My account" onClick={() => setShowAccount(true)}>
+          <button className="about-btn" aria-label="My account"
+            onClick={() => { setShowAccount(true); if (isOwner) refreshWaiting(); }}>
+            {isOwner && waiting > 0 && <span className="dot" aria-label={`${waiting} waiting for approval`} />}
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" />
             </svg>
@@ -153,24 +167,29 @@ export default function App() {
       </header>
       {showAbout && <AboutSheet user={user} onClose={() => setShowAbout(false)} />}
       {showAccount && (
-        <AccountSheet user={user} pending={pending} onClose={() => setShowAccount(false)}
+        <AccountSheet user={user} pending={pending} waiting={waiting} onClose={() => setShowAccount(false)}
           onUserChanged={updateUser} onSignOut={signOut}
           onOpenPeople={() => { setShowAccount(false); setShowPeople(true); }} />
       )}
-      {showPeople && <PeopleSheet onClose={() => setShowPeople(false)} />}
+      {showPeople && <PeopleSheet onClose={() => setShowPeople(false)} onPendingChanged={refreshWaiting} />}
       {tab === "farm" ? <FarmView />
         : isOwner
-          ? (tab === "rain" ? <RainView /> : tab === "water" ? <WaterView /> : <OwnerView tab={tab} />)
+          ? (tab === "rain" ? <RainView /> : tab === "water" ? <WaterView />
+            : tab === "tasks" ? <DayView onCountsChanged={refreshCounts} /> : <OwnerView tab={tab} />)
           : (tab === "rain"
               ? <RainView onCaptureToday={() => setTab("day")} />
               : <DayView onCountsChanged={refreshCounts} />)}
       {isOwner ? (
-        <nav className="tabs">
+        <nav className="tabs seven">
           <button className={tab === "day" ? "on" : ""} onClick={() => setTab("day")}>
             <TabIcon d="M3 3v18h18M7 16l4-8 4 4 4-6" />Digest
           </button>
+          {/* Owners can do the day's tasks themselves, same screen as the caretaker. */}
+          <button className={tab === "tasks" ? "on" : ""} onClick={() => setTab("tasks")}>
+            <TabIcon d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />Tasks
+          </button>
           <button className={tab === "decisions" ? "on" : ""} onClick={() => setTab("decisions")}>
-            <TabIcon d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />Decisions
+            <TabIcon d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" />Review
           </button>
           <button className={tab === "rain" ? "on" : ""} onClick={() => setTab("rain")}>
             <TabIcon d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z" />Rain

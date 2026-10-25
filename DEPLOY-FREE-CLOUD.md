@@ -55,11 +55,16 @@ billed.
 ### 4. Install Woodlands
 1. Back in **Compute Engine → VM instances**, click **SSH** on the `woodlands`
    row. A terminal window opens in the browser (allow the pop-up).
-2. Paste this line and press Enter:
+2. Paste this line, putting your own email and a password of your choice
+   (at least 8 characters) in place of the examples, and press Enter:
 
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/MFD-14/Farm-Manager/main/scripts/install-server.sh | sudo bash
+   curl -fsSL https://raw.githubusercontent.com/MFD-14/Farm-Manager/main/scripts/install-server.sh | sudo ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='YourPassword' bash
    ```
+
+   That email becomes the owner sign-in, with full admin access. Leave out
+   `ADMIN_EMAIL=… ADMIN_PASSWORD=…` to get a starter `owner@woodlands.farm`
+   account instead (you can switch it to your email later in the app).
 
 3. Wait 3–5 minutes. It finishes with a box like this:
 
@@ -155,7 +160,18 @@ then tap Share → **Add to Home Screen**.
 
 **Computer:** the same address works in any browser.
 
-## Use your own email
+## The caretaker's account
+
+On the caretaker's phone, open the app and tap **New here? Create an account**.
+They enter their name, email and a password of their own. The account then
+waits for you: a gold dot appears on the person icon in your app. Open
+**My account → People** and tap **Approve** (or **Decline** for anyone you
+don't know). The caretaker can then sign in.
+
+Once your caretaker has their own account, switch off the starter
+`caretaker@woodlands.farm` account under **People**.
+
+## Use your own email (if you skipped ADMIN_EMAIL)
 
 1. Sign in as `owner@woodlands.farm`, then tap the **person icon** at the top
    right to open **My account**.

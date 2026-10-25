@@ -6,6 +6,7 @@ import { applyTransition, isTerminal } from "./stateMachine.js";
 import { validateEvidence } from "./evidence.js";
 import { routeAfterDoneReported } from "./verification.js";
 import { instantiateChainsForAnchor } from "./chains.js";
+import { farmDateStr } from "../util/time.js";
 
 // Derived reading expressions used by the seed taxonomy.
 function deriveValue(expr, fields) {
@@ -156,8 +157,8 @@ export async function foldEvent(c, event, { skipSideEffects = false, replay = fa
       && (policy.vim_profile === "spray_scene" || policy.inventory_out)
       && !event.payload?.weather_at_application) {
     const fc = await c.query(`SELECT value FROM farm_settings WHERE key = 'forecast'`);
-    const dateStr = (event.device_time ? new Date(event.device_time) : new Date())
-      .toISOString().slice(0, 10);
+    // Farm-local date: the forecast is keyed by farm days, not UTC days.
+    const dateStr = farmDateStr(event.device_time ? new Date(event.device_time) : new Date());
     const day = fc.rows[0]?.value?.daily?.find((x) => x.date === dateStr);
     const rain = await c.query(
       `SELECT COALESCE(SUM(value),0) AS s FROM readings

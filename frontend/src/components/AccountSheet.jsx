@@ -58,7 +58,7 @@ export function PasswordForm({ onDone, forced, initialCurrent = "" }) {
   );
 }
 
-export default function AccountSheet({ user, pending, onClose, onUserChanged, onSignOut, onOpenPeople }) {
+export default function AccountSheet({ user, pending, waiting = 0, onClose, onUserChanged, onSignOut, onOpenPeople }) {
   const [name, setName] = useState(user.name || "");
   const [email, setEmail] = useState(user.email || "");
   const [phone, setPhone] = useState(user.phone || "");
@@ -93,13 +93,17 @@ export default function AccountSheet({ user, pending, onClose, onUserChanged, on
     <div className="sheet" onClick={onClose}>
       <div className="panel" onClick={(e) => e.stopPropagation()}>
         <h2>My account</h2>
-        <div className="code" style={{ textTransform: "capitalize" }}>{user.role}</div>
+        <div className="code">{user.role === "owner" ? "Owner · full admin access" : "Caretaker"}</div>
 
         {user.role === "owner" && onOpenPeople && (
           <button type="button" className="people-entry" onClick={onOpenPeople}>
             <span>
               <b>People</b>
-              <small>Add the caretaker and others, reset passwords, switch accounts off</small>
+              <small>
+                {waiting
+                  ? <b className="waiting-note">{waiting} new account{waiting === 1 ? "" : "s"} waiting for your approval</b>
+                  : "Add the caretaker and others, approve sign-ups, reset passwords"}
+              </small>
             </span>
             <span aria-hidden="true">›</span>
           </button>

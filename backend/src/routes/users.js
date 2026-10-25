@@ -1,6 +1,7 @@
-// People: the owner adds, edits, switches off and resets passwords for the
-// accounts that sign in to the farm. Accounts are never deleted, because the
-// event log records who did each piece of work.
+// People: the owner adds, approves, edits, switches off and resets passwords
+// for the accounts that sign in to the farm. Accounts are never deleted once
+// approved, because the event log records who did each piece of work; a
+// sign-up the owner declines (never approved, no history) is removed.
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { randomInt } from "node:crypto";
@@ -15,6 +16,7 @@ export function publicUser(u) {
   return {
     id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone,
     active: u.active, must_change_password: u.must_change_password,
+    pending_approval: u.pending_approval,
   };
 }
 
@@ -53,10 +55,31 @@ usersRouter.use(auth(), requireRole("owner", "admin"));
 usersRouter.param("id", (req, res, next, id) =>
   /^[0-9a-f-]{36}$/i.test(id) ? next() : res.status(404).json({ error: "not found" }));
 
+usersRouter.get("/pending-count", async (req, res) => {
+  const r = await q(`SELECT count(*)::int AS n FROM users WHERE pending_approval`);
+  res.json({ count: r.rows[0].n });
+});
+
+usersRouter.post("/:id/approve", async (req, res) => {
+  const role = ROLES.includes(req.body?.role) ? req.body.role : null;
+  const r = await q(
+    `UPDATE users SET active = true, pending_approval = false, role = COALESCE($2, role), updated_at = now()
+     WHERE id = $1 AND pending_approval RETURNING *`, [req.params.id, role]);
+  if (!r.rows[0]) return res.status(404).json({ error: "No sign-up waiting with that id" });
+  if (r.rows[0].phone) await syncWaContact(r.rows[0].id, r.rows[0].phone);
+  res.json({ user: publicUser(r.rows[0]) });
+});
+
+usersRouter.post("/:id/decline", async (req, res) => {
+  const r = await q(`DELETE FROM users WHERE id = $1 AND pending_approval RETURNING id`, [req.params.id]);
+  if (!r.rows[0]) return res.status(404).json({ error: "No sign-up waiting with that id" });
+  res.json({ ok: true });
+});
+
 usersRouter.get("/", async (req, res) => {
   const r = await q(
     `SELECT u.*, (SELECT max(last_sync_at) FROM devices d WHERE d.user_id = u.id AND NOT d.revoked) AS last_sync_at
-     FROM users u ORDER BY u.active DESC, u.role = 'owner' DESC, u.created_at`);
+     FROM users u ORDER BY u.pending_approval DESC, u.active DESC, u.role = 'owner' DESC, u.created_at`);
   res.json({
     users: r.rows.map((u) => ({
       ...publicUser(u), last_login_at: u.last_login_at, last_sync_at: u.last_sync_at,
@@ -122,6 +145,7 @@ usersRouter.patch("/:id", async (req, res) => {
   try {
     const r = await q(
       `UPDATE users SET name = $2, email = $3, role = $4, phone = $5, active = $6,
+         pending_approval = pending_approval AND NOT $6,
          token_version = token_version + CASE WHEN $6 = false AND active THEN 1 ELSE 0 END,
          updated_at = now()
        WHERE id = $1 RETURNING *`,

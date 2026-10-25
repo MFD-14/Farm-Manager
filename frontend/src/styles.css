@@ -354,3 +354,10 @@ button { font-family:var(--fb); cursor:pointer; }
 .otp-code { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:28px; font-weight:700;
   letter-spacing:2px; color:var(--g8); margin:8px 0 6px; user-select:all; }
 .otp-note { font-size:13px; color:var(--g8); line-height:1.45; margin:0; word-break:break-word; }
+.person.pending { border:1.5px solid var(--gold); background:#fffaf0; }
+.chip.role-pending { background:#fef3c7; color:#92400e; }
+.waiting-note { color:#92400e; font-weight:700; }
+.about-btn { position:relative; }
+.about-btn .dot { position:absolute; top:2px; right:2px; width:9px; height:9px; border-radius:50%;
+  background:var(--gold); box-shadow:0 0 0 2px #1a1209; }
+.tabs.seven button { font-size:10.5px; padding:10px 1px 12px; letter-spacing:.1px; }

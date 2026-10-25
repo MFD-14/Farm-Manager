@@ -6,7 +6,9 @@
 #
 # Re-running it updates the server to the latest version and keeps all data
 # and passwords. Optional overrides: DOMAIN=farm.example.com (otherwise a free
-# <ip>.sslip.io address is used), INSTALL_DIR (default /opt/woodlands).
+# <ip>.sslip.io address is used), INSTALL_DIR (default /opt/woodlands), and
+# ADMIN_EMAIL + ADMIN_PASSWORD (+ ADMIN_NAME) to make that the owner sign-in:
+#   curl -fsSL …/install-server.sh | sudo ADMIN_EMAIL=me@example.com ADMIN_PASSWORD='…' bash
 set -euo pipefail
 
 # Everything runs inside main so the whole script is read before any of it
@@ -133,6 +135,29 @@ if [ -z "$ok" ]; then
   fi
 fi
 
+# Optional: the farm owner's own sign-in, given on the install command line
+# (ADMIN_EMAIL=… ADMIN_PASSWORD=…). Applied once, never stored in .env, so a
+# password changed later in the app isn't reset by restarts.
+owner_lines="  Owner sign-in:      owner@woodlands.farm
+  Owner password:     ${owner_pw}"
+if [ -n "${ADMIN_EMAIL:-}" ]; then
+  say "Setting up the owner account for ${ADMIN_EMAIL}"
+  for _ in $(seq 1 24); do
+    curl -fsS --max-time 5 http://localhost:4000/api/health >/dev/null 2>&1 && break
+    sleep 5
+  done
+  if [ -z "${ADMIN_PASSWORD:-}" ]; then
+    warn "ADMIN_PASSWORD was not given, so ${ADMIN_EMAIL} was not set up."
+  elif docker compose exec -T -e ACCOUNT_EMAIL="${ADMIN_EMAIL}" -e ACCOUNT_PASSWORD="${ADMIN_PASSWORD}" \
+       -e ACCOUNT_NAME="${ADMIN_NAME:-}" app node src/jobs/set-owner.js; then
+    owner_lines="  Owner sign-in:      ${ADMIN_EMAIL}
+  Owner password:     the one you typed in the install command
+  (owner@woodlands.farm has become this account)"
+  else
+    warn "Could not set up ${ADMIN_EMAIL}; sign in as owner@woodlands.farm and change it under My account."
+  fi
+fi
+
 cat <<EOF
 
 ────────────────────────────────────────────────────────────
@@ -141,11 +166,13 @@ cat <<EOF
   Server address (type this into the phone app):
       https://${domain}
 
-  Owner sign-in:      owner@woodlands.farm
-  Owner password:     ${owner_pw}
+${owner_lines}
 
   Caretaker sign-in:  caretaker@woodlands.farm
   Caretaker password: ${caretaker_pw}
+
+  The caretaker can also tap "Create an account" on the sign-in
+  screen; approve them in the app under My account → People.
 
   Write these down now. They are also stored in ${INSTALL_DIR}/.env
   To update later, run the same install command again.
