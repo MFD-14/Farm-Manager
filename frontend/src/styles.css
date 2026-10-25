@@ -361,3 +361,50 @@ button { font-family:var(--fb); cursor:pointer; }
 .about-btn .dot { position:absolute; top:2px; right:2px; width:9px; height:9px; border-radius:50%;
   background:var(--gold); box-shadow:0 0 0 2px #1a1209; }
 .tabs.seven button { font-size:10.5px; padding:10px 1px 12px; letter-spacing:.1px; }
+
+/* ── Connections (WhatsApp & Claude) ─────────────────────── */
+.toggle-row { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:11px 2px;
+  border-bottom:1px solid var(--bl); cursor:pointer; }
+.toggle-row b { display:block; font-size:14.5px; color:var(--tx); }
+.toggle-row small { display:block; font-size:12.5px; color:var(--tm); margin-top:2px; }
+.toggle-row input { width:44px; height:24px; appearance:none; -webkit-appearance:none; border-radius:12px;
+  background:var(--bd); position:relative; flex-shrink:0; transition:background .15s ease; cursor:pointer; }
+.toggle-row input::after { content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:left .15s ease; }
+.toggle-row input:checked { background:var(--g5); }
+.toggle-row input:checked::after { left:23px; }
+.conn-card { padding:15px; }
+.conn-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:6px; }
+.conn-head b { display:block; font-size:16px; color:var(--tx); }
+.conn-head small { display:block; font-size:12.5px; color:var(--tm); margin-top:3px; line-height:1.4; }
+.chip.conn-on { background:var(--g1); color:var(--g8); white-space:nowrap; }
+.chip.conn-off { background:var(--bl); color:var(--ts); white-space:nowrap; }
+.copy-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+.copy-row code { flex:1; min-width:0; font-size:12.5px; background:var(--bl); padding:9px 10px; border-radius:9px;
+  word-break:break-all; color:var(--ts); }
+.copy-btn { padding:8px 12px; font-size:13px; border-radius:9px; flex-shrink:0; }
+.inline-field { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.inline-field label { margin:0; }
+.inline-field input { width:130px; padding:10px 12px; font-size:15px; }
+.link-btn.left { display:block; text-align:left; margin:12px 0 4px; }
+.tpl-list { background:var(--bg); border:1px solid var(--bd); border-radius:12px; padding:12px; margin-bottom:6px; }
+.tpl { padding:10px 0; border-bottom:1px solid var(--bl); }
+.tpl:last-of-type { border-bottom:none; }
+.tpl-body { font-size:13.5px; color:var(--tx); line-height:1.45; margin:2px 0 4px; }
+.test-row { display:flex; gap:8px; margin-top:10px; }
+.test-row select { flex:1; min-width:0; padding:11px; border:1.5px solid var(--bd); border-radius:12px;
+  background:var(--sf); font-family:var(--fb); font-size:14px; color:var(--tx); }
+.test-row .btn { padding:11px 14px; font-size:14px; }
+.act-row { display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-bottom:1px solid var(--bl); font-size:13px; }
+.act-when { width:46px; flex-shrink:0; color:var(--tm); font-size:12px; padding-top:1px; }
+.act-what { flex:1; min-width:0; color:var(--tx); }
+.act-what small { display:block; color:var(--tm); font-size:12px; margin-top:2px; word-break:break-word; }
+.act-what small.act-err { color:var(--r5); }
+.act-status { flex-shrink:0; font-size:11.5px; font-weight:700; padding:3px 8px; border-radius:8px; max-width:110px; text-align:right; }
+.act-status.ok { background:var(--g0); color:var(--g7); }
+.act-status.bad { background:var(--r1); color:var(--r5); }
+.act-status.warn { background:#fef3c7; color:#92400e; }
+.act-status.muted { background:var(--bl); color:var(--tm); }
+.verdict { padding:6px 0 10px; border-bottom:1px solid var(--bl); }
+.verdict-reason { font-size:13.5px; color:var(--tx); margin:4px 0 2px; line-height:1.45; }
+.verdict-meta { font-size:12.5px; color:var(--tm); margin-top:2px; }

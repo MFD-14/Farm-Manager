@@ -8,6 +8,7 @@ import { runEscalationSweep } from "./engine/escalation.js";
 import { evaluateRules } from "./engine/rules.js";
 import { sendDigest } from "./engine/digest.js";
 import { processVimQueue, vimOutageSweep } from "./workers/vim.js";
+import { runMorningPlan } from "./workers/morningPlan.js";
 import { fetchForecast } from "./workers/forecast.js";
 import { farmDateStr } from "./util/time.js";
 
@@ -40,6 +41,7 @@ async function main() {
     try {
       await tx((c) => runEscalationSweep(c));
       await tx((c) => evaluateRules(c));
+      await tx((c) => runMorningPlan(c));
       await processVimQueue();
     } catch (e) { console.error("sweep failed", e); }
   }, TZ);

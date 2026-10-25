@@ -10,6 +10,7 @@ import FarmView from "./views/FarmView.jsx";
 import AboutSheet from "./components/AboutSheet.jsx";
 import AccountSheet, { PasswordForm } from "./components/AccountSheet.jsx";
 import PeopleSheet from "./components/PeopleSheet.jsx";
+import ConnectionsSheet from "./components/ConnectionsSheet.jsx";
 
 // Barn outline for the Farm tab.
 const FARM_ICON = "M3 21V10l9-6 9 6v11M9 21v-6h6v6M3 21h18";
@@ -32,6 +33,7 @@ export default function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const [showPeople, setShowPeople] = useState(false);
+  const [showConnections, setShowConnections] = useState(false);
   const [notice, setNotice] = useState(null);
   const [oneTime, setOneTime] = useState(""); // kept in memory only
   const [waiting, setWaiting] = useState(0); // sign-ups awaiting an owner
@@ -169,9 +171,11 @@ export default function App() {
       {showAccount && (
         <AccountSheet user={user} pending={pending} waiting={waiting} onClose={() => setShowAccount(false)}
           onUserChanged={updateUser} onSignOut={signOut}
-          onOpenPeople={() => { setShowAccount(false); setShowPeople(true); }} />
+          onOpenPeople={() => { setShowAccount(false); setShowPeople(true); }}
+          onOpenConnections={() => { setShowAccount(false); setShowConnections(true); }} />
       )}
       {showPeople && <PeopleSheet onClose={() => setShowPeople(false)} onPendingChanged={refreshWaiting} />}
+      {showConnections && <ConnectionsSheet onClose={() => setShowConnections(false)} />}
       {tab === "farm" ? <FarmView />
         : isOwner
           ? (tab === "rain" ? <RainView /> : tab === "water" ? <WaterView />

@@ -120,9 +120,18 @@ function Decisions() {
               <>
                 <div className="section-title">Machine verdicts</div>
                 {detail.verdicts.map((v, i) => (
-                  <div className="kv" key={i}>
-                    <span>{v.model_version}</span>
-                    <b>{v.verdict} · {Math.round(v.confidence * 100)}%</b>
+                  <div className="verdict" key={i}>
+                    <div className="kv">
+                      <span>{v.extracted?.engine === "claude" ? `Claude (${v.extracted.model || v.model_version})` : v.model_version}</span>
+                      <b>{v.verdict} · {Math.round(v.confidence * 100)}%</b>
+                    </div>
+                    {v.extracted?.reason && <p className="verdict-reason">{v.extracted.reason}</p>}
+                    {v.extracted?.matches_report && v.extracted.matches_report !== "nothing_reported" && (
+                      <div className="verdict-meta">Matches what was reported: {v.extracted.matches_report}</div>
+                    )}
+                    {(v.extracted?.readings || []).length > 0 && (
+                      <div className="verdict-meta">Read from photo: {v.extracted.readings.map((r) => `${r.name} ${r.value}`).join(", ")}</div>
+                    )}
                   </div>
                 ))}
               </>

@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { randomInt } from "node:crypto";
 import { q } from "../db/pool.js";
 import { auth, requireRole } from "../middleware/auth.js";
+import { normalizePhone } from "../util/phone.js";
 
 export const usersRouter = Router();
 
@@ -14,7 +15,7 @@ export const ROLES = ["owner", "caretaker"];
 
 export function publicUser(u) {
   return {
-    id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone,
+    id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone, wa_opt_in: u.wa_opt_in,
     active: u.active, must_change_password: u.must_change_password,
     pending_approval: u.pending_approval,
   };
@@ -37,12 +38,13 @@ export function generatePassword(len = 10) {
   return out;
 }
 
-// WhatsApp allow-list follows the account's phone number.
+// WhatsApp allow-list follows the account's phone number. A number moving to a
+// new account (a replacement caretaker on the farm phone) moves with it.
 export async function syncWaContact(userId, phone) {
   await q(`DELETE FROM wa_contacts WHERE user_id = $1`, [userId]);
   if (phone) {
-    await q(`INSERT INTO wa_contacts (user_id, wa_phone) VALUES ($1, $2) ON CONFLICT (wa_phone) DO NOTHING`,
-      [userId, phone]);
+    await q(`INSERT INTO wa_contacts (user_id, wa_phone) VALUES ($1, $2)
+             ON CONFLICT (wa_phone) DO UPDATE SET user_id = EXCLUDED.user_id`, [userId, phone]);
   }
 }
 
@@ -106,7 +108,7 @@ usersRouter.post("/", async (req, res) => {
     const r = await q(
       `INSERT INTO users (email, password_hash, name, role, phone, must_change_password)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [email, bcrypt.hashSync(password, 10), String(name).trim(), role, String(phone || "").trim() || null, !given]);
+      [email, bcrypt.hashSync(password, 10), String(name).trim(), role, normalizePhone(phone), !given]);
     if (r.rows[0].phone) await syncWaContact(r.rows[0].id, r.rows[0].phone);
     res.status(201).json({ user: publicUser(r.rows[0]), temp_password: given ? null : password });
   } catch (err) {
@@ -124,7 +126,8 @@ usersRouter.patch("/:id", async (req, res) => {
     name: b.name !== undefined ? String(b.name).trim() : cur.name,
     email: b.email !== undefined ? normalizeEmail(b.email) : cur.email,
     role: b.role !== undefined ? b.role : cur.role,
-    phone: b.phone !== undefined ? (String(b.phone).trim() || null) : cur.phone,
+    phone: b.phone !== undefined ? normalizePhone(b.phone) : cur.phone,
+    wa_opt_in: b.wa_opt_in !== undefined ? !!b.wa_opt_in : cur.wa_opt_in,
     active: b.active !== undefined ? !!b.active : cur.active,
   };
   if (!next.name) return res.status(400).json({ error: "Name can't be empty" });
@@ -144,12 +147,12 @@ usersRouter.patch("/:id", async (req, res) => {
   }
   try {
     const r = await q(
-      `UPDATE users SET name = $2, email = $3, role = $4, phone = $5, active = $6,
+      `UPDATE users SET name = $2, email = $3, role = $4, phone = $5, active = $6, wa_opt_in = $7,
          pending_approval = pending_approval AND NOT $6,
          token_version = token_version + CASE WHEN $6 = false AND active THEN 1 ELSE 0 END,
          updated_at = now()
        WHERE id = $1 RETURNING *`,
-      [cur.id, next.name, next.email, next.role, next.phone, next.active]);
+      [cur.id, next.name, next.email, next.role, next.phone, next.active, next.wa_opt_in]);
     if (next.phone !== cur.phone) await syncWaContact(cur.id, next.phone);
     res.json({ user: publicUser(r.rows[0]) });
   } catch (err) {

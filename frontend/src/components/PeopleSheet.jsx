@@ -45,7 +45,7 @@ function PersonForm({ initial, isMe, onSaved, onCancel }) {
   const editing = !!initial;
   const [f, setF] = useState({
     name: initial?.name || "", email: initial?.email || "", role: initial?.role || "caretaker",
-    phone: initial?.phone || "", password: "",
+    phone: initial?.phone || "", password: "", wa_opt_in: initial ? initial.wa_opt_in !== false : true,
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
@@ -58,7 +58,7 @@ function PersonForm({ initial, isMe, onSaved, onCancel }) {
       const r = editing
         ? await apiJson(`/api/users/${initial.id}`, {
             method: "PATCH",
-            body: { name: f.name, phone: f.phone, ...(isMe ? {} : { email: f.email, role: f.role }) },
+            body: { name: f.name, phone: f.phone, wa_opt_in: f.wa_opt_in, ...(isMe ? {} : { email: f.email, role: f.role }) },
           })
         : await apiJson("/api/users", {
             method: "POST",
@@ -93,8 +93,15 @@ function PersonForm({ initial, isMe, onSaved, onCancel }) {
       </div>
       <div className="field">
         <label>Phone (WhatsApp)</label>
-        <input type="tel" value={f.phone} onChange={set("phone")} placeholder="+263…" />
+        <input type="tel" value={f.phone} onChange={set("phone")} placeholder="e.g. 0771234567" />
+        <small className="field-hint">Needed for WhatsApp reminders.</small>
       </div>
+      {editing && (
+        <label className="toggle-row">
+          <span><b>WhatsApp messages from the farm</b><small>Reminders, morning list, retake requests</small></span>
+          <input type="checkbox" checked={f.wa_opt_in} onChange={(e) => setF({ ...f, wa_opt_in: e.target.checked })} />
+        </label>
+      )}
       {!editing && (
         <div className="field">
           <label>Password (optional)</label>

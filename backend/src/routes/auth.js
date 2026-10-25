@@ -2,6 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { q } from "../db/pool.js";
 import { sign, auth } from "../middleware/auth.js";
+import { normalizePhone } from "../util/phone.js";
 import { publicUser, normalizeEmail, validEmail, passwordProblem, syncWaContact } from "./users.js";
 
 export const authRouter = Router();
@@ -29,7 +30,7 @@ const MAX_PENDING = 20;
 authRouter.post("/signup", async (req, res) => {
   const name = String(req.body?.name || "").trim();
   const email = normalizeEmail(req.body?.email);
-  const phone = String(req.body?.phone || "").trim() || null;
+  const phone = normalizePhone(req.body?.phone);
   const password = req.body?.password;
   if (!name) return res.status(400).json({ error: "Please enter your name" });
   if (!validEmail(email)) return res.status(400).json({ error: "That doesn't look like an email address" });
@@ -58,11 +59,12 @@ authRouter.get("/me", auth(), async (req, res) => {
 
 // Own profile. Changing the sign-in email needs the current password.
 authRouter.patch("/me", auth(), async (req, res) => {
-  const { name, phone, email, current_password } = req.body || {};
+  const { name, phone, email, current_password, wa_opt_in } = req.body || {};
   const me = (await q(`SELECT * FROM users WHERE id = $1`, [req.user.id])).rows[0];
   const next = {
     name: name !== undefined ? String(name).trim() : me.name,
-    phone: phone !== undefined ? (String(phone).trim() || null) : me.phone,
+    phone: phone !== undefined ? normalizePhone(phone) : me.phone,
+    wa_opt_in: wa_opt_in !== undefined ? !!wa_opt_in : me.wa_opt_in,
     email: email !== undefined ? normalizeEmail(email) : me.email,
   };
   if (!next.name) return res.status(400).json({ error: "Name can't be empty" });
@@ -74,8 +76,8 @@ authRouter.patch("/me", auth(), async (req, res) => {
   }
   try {
     const r = await q(
-      `UPDATE users SET name = $2, phone = $3, email = $4, updated_at = now() WHERE id = $1 RETURNING *`,
-      [me.id, next.name, next.phone, next.email]);
+      `UPDATE users SET name = $2, phone = $3, email = $4, wa_opt_in = $5, updated_at = now() WHERE id = $1 RETURNING *`,
+      [me.id, next.name, next.phone, next.email, next.wa_opt_in]);
     if (next.phone !== me.phone) await syncWaContact(me.id, next.phone);
     res.json({ user: publicUser(r.rows[0]) });
   } catch (err) {

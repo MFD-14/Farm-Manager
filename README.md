@@ -18,6 +18,9 @@ core design decision, quoted from the spec:
 **Server:** free Google Cloud / Oracle Cloud setup with a one-command
 installer in [DEPLOY-FREE-CLOUD.md](DEPLOY-FREE-CLOUD.md).
 
+**WhatsApp reminders and Claude photo checking:** set up in the app; keys and
+steps in [WHATSAPP-AND-CLAUDE-SETUP.md](WHATSAPP-AND-CLAUDE-SETUP.md).
+
 **Phones:** see [INSTALL-PHONES.md](INSTALL-PHONES.md). Android APK:
 <https://github.com/MFD-14/Farm-Manager/releases/download/android-latest/woodlands.apk>
 (rebuilt automatically on every app change). iPhone: add the server address
@@ -152,8 +155,8 @@ node src/jobs/rebuild-projections.js   # replay the event log
 | Variable | Meaning |
 |----------|---------|
 | `TANK_USABLE` | Measured usable tank litres, entered after Phase 0 rehabilitation; parameterises trigger T1 and the water balance |
-| `VIM_MODE` + `ANTHROPIC_API_KEY` | `heuristic` (default) or `claude` for Claude Vision verification |
-| `WA_TOKEN`, `WA_PHONE_ID`, `WA_VERIFY_TOKEN` | WhatsApp Business Cloud API; sender degrades to log-only without them |
+| `VIM_MODE` + `ANTHROPIC_API_KEY` (+ `VIM_MODEL`, `VIM_MONTHLY_CAP_USD`) | Defaults for Claude photo checking; normally set in the app (owner: My account → WhatsApp & photo checking), which takes priority |
+| `WA_TOKEN`, `WA_PHONE_ID`, `WA_APP_SECRET`, `WA_VERIFY_TOKEN` | Defaults for the WhatsApp Business Cloud API, likewise set in the app; the sender degrades to log-only without them |
 | `FARM_TZ` | Farm timezone, default `Africa/Harare` |
 | `FARM_LAT`, `FARM_LNG` | Farm coordinates for the forecast feed, default Kwekwe (-18.9281, 29.8149) |
 

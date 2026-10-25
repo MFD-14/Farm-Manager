@@ -4,7 +4,7 @@
 import { randomUUID } from "node:crypto";
 import { foldEvent } from "./fold.js";
 import { notify, notifyCollapsedOverdue } from "../workers/notifier.js";
-import { sendTaskButtons } from "../workers/whatsappSender.js";
+import { sendTaskReminder, reminderRecipient } from "../workers/whatsappSender.js";
 
 async function absenceMode(c) {
   const r = await c.query(`SELECT value FROM farm_settings WHERE key = 'absence_mode'`);
@@ -45,12 +45,13 @@ async function fireRung(c, instance, rung, absence) {
     for (const channel of rung.channels || []) {
       if (channel === "local") continue; // mirrored client-side from the cached plan
       if (channel === "whatsapp" && rung.buttons && to === "caretaker") {
-        const u = await c.query(`SELECT phone FROM users WHERE role = 'caretaker' AND active ORDER BY created_at LIMIT 1`);
-        if (u.rows[0]?.phone) await sendTaskButtons(c, { toPhone: u.rows[0].phone, instance });
+        // Done / Problem / Skip buttons to whoever the task is assigned to.
+        const user = await reminderRecipient(c, instance);
+        if (user) await sendTaskReminder(c, { user, instance }).catch(() => {});
         await c.query(
           `INSERT INTO notifications_log (channel, rung, instance_id, recipient, body)
            VALUES ('whatsapp', $1, $2, $3, $4)`,
-          [rung.key, instance.id, u.rows[0]?.phone || "caretaker", { buttons: true }]);
+          [rung.key, instance.id, user?.phone || "caretaker", { buttons: true }]);
       } else {
         await notify(c, {
           channel, to: to === "deputy" ? "owner" : to, rung: rung.key, instanceId: instance.id,
@@ -143,9 +144,9 @@ export async function runEscalationSweep(c, { now = new Date() } = {}) {
   }
   if (fresh.length) {
     await notifyCollapsedOverdue(c, {
-      to: "caretaker",
       instances: fresh.map(({ inst }) => inst),
       rung: fresh[0].rung.key,
+      buttons: fresh.some(({ rung }) => rung.buttons),
     });
     for (const { inst, rung } of fresh) {
       await foldEvent(c, {

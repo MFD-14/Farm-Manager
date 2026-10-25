@@ -58,17 +58,19 @@ export function PasswordForm({ onDone, forced, initialCurrent = "" }) {
   );
 }
 
-export default function AccountSheet({ user, pending, waiting = 0, onClose, onUserChanged, onSignOut, onOpenPeople }) {
+export default function AccountSheet({ user, pending, waiting = 0, onClose, onUserChanged, onSignOut, onOpenPeople, onOpenConnections }) {
   const [name, setName] = useState(user.name || "");
   const [email, setEmail] = useState(user.email || "");
   const [phone, setPhone] = useState(user.phone || "");
+  const [waOptIn, setWaOptIn] = useState(user.wa_opt_in !== false);
   const [current, setCurrent] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [confirmOut, setConfirmOut] = useState(false);
 
   const emailChanged = email.trim().toLowerCase() !== (user.email || "").toLowerCase();
-  const dirty = emailChanged || name.trim() !== (user.name || "") || phone.trim() !== (user.phone || "");
+  const dirty = emailChanged || name.trim() !== (user.name || "") || phone.trim() !== (user.phone || "")
+    || waOptIn !== (user.wa_opt_in !== false);
 
   async function saveProfile(e) {
     e.preventDefault();
@@ -76,7 +78,7 @@ export default function AccountSheet({ user, pending, waiting = 0, onClose, onUs
     try {
       const r = await apiJson("/api/auth/me", {
         method: "PATCH",
-        body: { name, phone, email, ...(emailChanged ? { current_password: current } : {}) },
+        body: { name, phone, email, wa_opt_in: waOptIn, ...(emailChanged ? { current_password: current } : {}) },
       });
       await metaSet("user", r.user);
       onUserChanged(r.user);
@@ -108,6 +110,15 @@ export default function AccountSheet({ user, pending, waiting = 0, onClose, onUs
             <span aria-hidden="true">›</span>
           </button>
         )}
+        {user.role === "owner" && onOpenConnections && (
+          <button type="button" className="people-entry" onClick={onOpenConnections}>
+            <span>
+              <b>WhatsApp & photo checking</b>
+              <small>WhatsApp reminders for the caretaker, and Claude checking evidence photos</small>
+            </span>
+            <span aria-hidden="true">›</span>
+          </button>
+        )}
 
         <div className="section-title">Profile</div>
         <form onSubmit={saveProfile}>
@@ -128,8 +139,13 @@ export default function AccountSheet({ user, pending, waiting = 0, onClose, onUs
           )}
           <div className="field">
             <label>Phone (WhatsApp)</label>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+263…" autoComplete="tel" />
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. 0771234567" autoComplete="tel" />
           </div>
+          <label className="toggle-row">
+            <span><b>WhatsApp messages from the farm</b><small>{user.role === "owner"
+              ? "Alerts and the evening digest" : "Task reminders and the morning task list"}</small></span>
+            <input type="checkbox" checked={waOptIn} onChange={(e) => setWaOptIn(e.target.checked)} />
+          </label>
           {msg && <p className={`form-msg ${msg.ok ? "good" : "bad"}`}>{msg.text}</p>}
           <button className="btn primary block" disabled={busy || !dirty || !name.trim() || (emailChanged && !current)}>
             {busy ? "Saving…" : "Save profile"}

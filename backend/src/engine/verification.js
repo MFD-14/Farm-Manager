@@ -108,6 +108,15 @@ export async function applyVimVerdict(c, verdict) {
   }, verdicts[0]);
   const minConf = Math.min(...verdicts.map((v) => Number(v.confidence)));
 
+  // A verifier that declined to assess is not a bad photo: straight to the owner.
+  const refused = verdicts.find((v) => v.extracted?.refused);
+  if (refused) {
+    await appendSystemEvent(c, instance.id, "review_required", {
+      flags: [{ kind: "vim_refused", extracted: refused.extracted }],
+    });
+    return;
+  }
+
   if (worst.verdict === "pass" && minConf >= 0.8) {
     await appendSystemEvent(c, instance.id, "auto_verified", {
       verification: { method: "vim", verdict: "pass", confidence: minConf, extracted: worst.extracted },
@@ -119,9 +128,11 @@ export async function applyVimVerdict(c, verdict) {
       await c.query(
         `UPDATE task_instances SET evidence_summary = evidence_summary || '{"retake_requested": true}', updated_at = now() WHERE id = $1`,
         [instance.id]);
-      await appendSystemEvent(c, instance.id, "retake_requested", {
-        reason: worst.extracted?.reason || "unusable media, please retake",
-      });
+      const reason = worst.extracted?.retake_hint || worst.extracted?.reason || "unusable media, please retake";
+      await appendSystemEvent(c, instance.id, "retake_requested", { reason });
+      // Tell the caretaker on WhatsApp too; the app shows it on next sync.
+      const { sendRetakeRequest } = await import("../workers/whatsappSender.js");
+      await sendRetakeRequest(c, { instance, reason }).catch(() => {});
     } else {
       await appendSystemEvent(c, instance.id, "review_required", { flags: [{ kind: "vim_unusable_after_retake" }] });
     }
