@@ -47,3 +47,15 @@ export function requireRole(...roles) {
     next();
   };
 }
+
+// Sales money is for owners and task managers only: a caretaker records a
+// sale's amount but never gets amounts back from the server (task records,
+// the day bundle's last values, event payloads).
+const MONEY_KEYS = new Set(["price_usd"]);
+export function hideRevenue(req, res, next) {
+  const json = res.json.bind(res);
+  res.json = (body) => (req.user && !["owner", "admin", "manager"].includes(req.user.role)
+    ? json(JSON.parse(JSON.stringify(body, (k, v) => (MONEY_KEYS.has(k) ? undefined : v))))
+    : json(body));
+  next();
+}

@@ -262,3 +262,27 @@ test("dashboard: week to date counts labour hours from clock pairs and this week
   assert.deepEqual(d.week.labour_by_person, [{ name: "Caretaker", hours: 8 }]);
   assert.deepEqual(d.week.revenue_usd, { now: 50, before: 40 });
 });
+
+test("revenue: caretakers enter a sale's amount but never get amounts back; dashboard and KPIs are console-only", async () => {
+  await tx((c) => runRelease(c, TODAY));
+  const [sale] = await instancesByCode("C-02");
+  const s = await api("/api/sync/events", { method: "POST", token: caretakerToken, body: { events: [{
+    event_uuid: randomUUID(), instance_id: sale.id, type: "done_reported",
+    payload: { fields: { bundles_sold: 48, price_usd: 48, buyer: "Mbare market" } }, device_time: new Date().toISOString() }] } });
+  assert.equal(s.json.accepted.length, 1, JSON.stringify(s.json));
+
+  const own = (await api("/api/instances", { token: ownerToken })).json.instances.find((i) => i.id === sale.id);
+  assert.equal(own.evidence_summary.fields.price_usd, 48);
+  const care = (await api("/api/instances", { token: caretakerToken })).json.instances.find((i) => i.id === sale.id);
+  assert.equal(care.evidence_summary.fields.bundles_sold, 48);
+  assert.equal(care.evidence_summary.fields.price_usd, undefined);
+  // The form definition still names the field ("key":"price_usd"); no amount comes back.
+  const amount = /"price_usd":\s*\d/;
+  assert.ok(amount.test((await api(`/api/instances/${sale.id}`, { token: ownerToken })).text));
+  assert.ok(!amount.test((await api(`/api/instances/${sale.id}`, { token: caretakerToken })).text));
+  assert.ok(!amount.test((await api("/api/sync/bundle", { token: caretakerToken })).text));
+
+  assert.equal((await api("/api/owner/digest", { token: caretakerToken })).status, 403);
+  assert.equal((await api("/api/owner/kpis", { token: caretakerToken })).status, 403);
+  assert.equal((await api("/api/owner/digest", { token: ownerToken })).status, 200);
+});

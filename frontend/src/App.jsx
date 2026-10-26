@@ -203,7 +203,7 @@ export default function App() {
     tasks: () => <DayView onCountsChanged={refreshCounts} onAddNote={() => setTab("notes")} canAddTask={isConsole} />,
     review: () => <OwnerView tab="decisions" />,
     notes: () => <NotesView onCountsChanged={refreshCounts} />,
-    sales: () => <SalesView onCountsChanged={refreshCounts} />,
+    sales: () => <SalesView onCountsChanged={refreshCounts} showRevenue={isConsole} />,
     farm: () => <FarmView />,
     crop: () => <CropPlanView mode="crop" />,
     cropmap: () => <CropPlanView mode="map" />,

@@ -67,7 +67,7 @@ rulesRouter.post("/:id/toggle", auth(), requireRole("owner", "admin"), async (re
   res.json({ rule: r.rows[0] });
 });
 
-ownerRouter.get("/digest", auth(), async (req, res) => {
+ownerRouter.get("/digest", auth(), requireRole("owner", "admin", "manager"), async (req, res) => {
   const digest = await tx((c) => buildDigest(c, req.query.date || farmDateStr()));
   res.json(digest);
 });
@@ -235,7 +235,7 @@ ownerRouter.get("/farm", auth(), async (req, res) => {
   });
 });
 
-ownerRouter.get("/kpis", auth(), async (req, res) => {
+ownerRouter.get("/kpis", auth(), requireRole("owner", "admin", "manager"), async (req, res) => {
   const days = Math.min(365, parseInt(req.query.period || "7", 10) || 7);
   const kpis = await tx((c) => computeKpis(c, { days }));
   res.json(kpis);
