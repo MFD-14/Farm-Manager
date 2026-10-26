@@ -19,8 +19,6 @@ export const config = {
   tankUsable: parseInt(env.TANK_USABLE || "80000", 10),
   poolVolume: parseInt(env.POOL_VOLUME || "45000", 10),
   boreholeLph: parseInt(env.BOREHOLE_LPH || "6000", 10),
-  anthropicKey: env.ANTHROPIC_API_KEY || "",
-  vimMode: env.VIM_MODE || "heuristic", // heuristic | claude
   wa: {
     token: env.WA_TOKEN || "",
     phoneId: env.WA_PHONE_ID || "",

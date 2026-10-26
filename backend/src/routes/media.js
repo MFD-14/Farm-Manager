@@ -1,5 +1,6 @@
 // Resumable media pipeline (spec 6.2, 7.2 item 3): initiate, offset-based chunk
-// PATCH (308 on partial), complete triggers vim_job creation. Files land on disk
+// PATCH (308 on partial); complete re-runs verification routing so a task whose
+// evidence just finished uploading moves to the acceptance queue. Files land on disk
 // under MEDIA_DIR; the storage key is recorded so object storage can replace the
 // filesystem without touching callers.
 import { Router } from "express";
@@ -15,6 +16,11 @@ import { config } from "../config.js";
 export const mediaRouter = Router();
 
 const mediaPath = (key) => path.join(config.mediaDir, key);
+const MIME_EXT = {
+  "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic",
+  "video/mp4": "mp4", "video/webm": "webm", "video/3gpp": "3gp", "video/quicktime": "mov",
+  "audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "m4a", "audio/mpeg": "mp3", "audio/aac": "aac", "audio/amr": "amr",
+};
 fs.mkdirSync(config.mediaDir, { recursive: true });
 
 // Perceptual-hash stand-in: sha256 over the raw bytes plus a coarse byte histogram
@@ -29,9 +35,13 @@ function computeHashes(buf) {
 }
 
 mediaRouter.post("/initiate", auth(), async (req, res) => {
-  const { media_uuid, instance_id, kind = "photo", bytes, sha256, captured_at, gps, exif } = req.body || {};
+  const { media_uuid, instance_id, kind = "photo", bytes, sha256, captured_at, gps, exif, mime } = req.body || {};
   if (!media_uuid || !bytes) return res.status(400).json({ error: "media_uuid and bytes required" });
-  const storageKey = `${media_uuid}.${kind === "photo" ? "jpg" : kind === "video" ? "mp4" : "ogg"}`;
+  if (!["photo", "video", "audio"].includes(kind)) return res.status(400).json({ error: "kind must be photo, video or audio" });
+  // The file keeps its real format (gallery videos, phone voice notes) so it
+  // plays back from off site.
+  const ext = MIME_EXT[String(mime || "").split(";")[0]] || (kind === "photo" ? "jpg" : kind === "video" ? "mp4" : "ogg");
+  const storageKey = `${media_uuid}.${ext}`;
   await q(
     `INSERT INTO media_objects (media_uuid, instance_id, event_uuid, kind, status, storage_key, bytes, sha256, captured_at, gps, exif, device_id)
      VALUES ($1,$2,NULL,$3,'uploading',$4,$5,$6,$7,$8,$9,$10)

@@ -1,11 +1,10 @@
-# WhatsApp reminders and Claude photo checking
+# WhatsApp reminders
 
-Both are switched on in the app: **My account (person icon) → WhatsApp & photo
-checking**. This guide covers getting the keys to paste there. Do Claude first
-(10 minutes); WhatsApp takes longer because Meta approves the message templates.
+Switched on in the app: **My account (person icon) → WhatsApp** (owners only).
+This guide covers getting the keys to paste there.
 
-First update your server so it has these features. Open the SSH window and run
-the install command again:
+First update your server so it has the latest features. Open the SSH window
+and run the install command again:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/MFD-14/Farm-Manager/main/scripts/install-server.sh | sudo bash
@@ -13,52 +12,15 @@ curl -fsSL https://raw.githubusercontent.com/MFD-14/Farm-Manager/main/scripts/in
 
 Your data, accounts and passwords are kept.
 
----
-
-## Part A: Claude photo checking
-
-**What it does.** Every evidence photo (tank gauge, kale bundles, wet drip line,
-feed trough, sprayer…) is checked within about 5 minutes:
-
-- **Pass** (Claude at least 80% sure): the task closes as verified.
-- **Unusable** (too dark, blurred, wrong thing): the caretaker is asked to retake
-  it, on WhatsApp if it's set up, with Claude's tip ("Use the torch and move
-  closer to the gauge").
-- **Anything else** (contradicts the report, unsure, or Claude declined): the
-  task goes to your **Review** tab with Claude's reason and what it read off the
-  photo, for you to decide. A failed check never rejects a task by itself.
-
-**Steps**
-
-1. Go to <https://console.anthropic.com> and create an account.
-2. **Billing**: add a payment card and buy some credit ($5 to $10 lasts a long
-   time at farm volumes).
-3. **API keys → Create key**, name it `Woodlands`, and copy it (it starts with
-   `sk-ant-`). It's shown once.
-4. In the Woodlands app: **WhatsApp & photo checking → Claude photo checking**:
-   - Paste the key into **Anthropic API key**.
-   - Switch on **Check photos with Claude**.
-   - Choose the **Model** and set a **Monthly spending cap**.
-   - Tap **Save**, then **Test the API key**. It should say "Connected".
-
-**Cost** (rough, per photo checked):
-
-| Model | Per photo | 20 photos a day for a month |
-|---|---|---|
-| Opus 5.5, most careful (default) | about 2¢ | about $12 |
-| Sonnet 5.5, balanced | about 1¢ | about $6 |
-| Haiku 5.5, cheapest | under 0.1¢ | under $1 |
-
-"How carefully" set to Quick costs less; Thorough costs more. When the monthly
-cap is reached, photos fall back to the basic size check until next month. The
-**This month** line shows photos checked and money spent.
-
-Photos are sent to Anthropic to be checked. The privacy page at
-`https://<your server>/privacy.html` says so.
+**How evidence is checked.** Photos, videos and voice notes are not checked by
+a machine. They upload with the task (from the app, or as a WhatsApp reply) and
+the task waits in **Review → Ready to accept** until an owner or task manager
+taps **Accept**, or **Send back** with a reason. The caretaker gets the reason
+on WhatsApp.
 
 ---
 
-## Part B: WhatsApp reminders
+## Setting up WhatsApp
 
 **What it does**
 
@@ -66,8 +28,10 @@ Photos are sent to Anthropic to be checked. The privacy page at
   comes with **Done / Problem / Skip** buttons; several overdue tasks come as one
   list.
 - **Morning task list** at the time you choose (default 06:00).
-- **Retake requests** when Claude can't use a photo.
-- **Alerts to you** when a task is missed twice, plus the 19:00 digest.
+- **Sent-back notices** when an owner or task manager sends a task back, with
+  the reason.
+- **Alerts to owners and task managers** when a task is missed twice, plus the
+  19:00 digest.
 - The caretaker can **reply with a photo**. It attaches to the task; if several
   tasks are open, the farm number asks "Which task is this for?" and a number
   reply attaches it. Typing `done`, `problem` or `skip` also works.
@@ -117,7 +81,7 @@ Woodlands refuses any message that didn't really come from Meta.
 
 ### 5. Paste into Woodlands
 
-In **WhatsApp & photo checking → WhatsApp reminders**, paste the **access
+In **My account → WhatsApp**, paste the **access
 token**, **phone number ID** and **app secret**, then tap **Save**. The card now
 says **Connected**.
 
@@ -156,7 +120,7 @@ The templates are:
 | `woodlands_task_reminder` | Reminder from Woodlands Farm: {{1}} was due at {{2}}. Please do it now and tap a button below when it is done. *(quick replies: Done, Problem, Skip)* |
 | `woodlands_overdue_list` | Woodlands Farm: you have {{1}} overdue tasks: {{2}}. Please open the Woodlands app to record them. |
 | `woodlands_morning_plan` | Good morning {{1}}. You have {{2}} farm tasks today: {{3}}. Open the Woodlands app to see the details. |
-| `woodlands_photo_retake` | Woodlands Farm: please take the photo for {{1}} again. Reason: {{2}}. |
+| `woodlands_task_sent_back` | Woodlands Farm: {{1}} was sent back. Reason: {{2}}. Please redo it and record it in the Woodlands app. |
 | `woodlands_owner_alert` | Woodlands Farm alert: {{1}}. Open the Woodlands app for details. |
 
 If WhatsApp Manager saves the language as English (US), set **Template language
@@ -186,10 +150,8 @@ approved yet, or a number isn't on WhatsApp.
 | "Recipient phone number not in allowed list" | The Meta app is still in development mode with Meta's test number. Use the farm number and switch the app to Live. |
 | Webhook "Verify and save" fails | The server address must be the https one and reachable. Copy the URL and token again from the card. |
 | Replies don't do anything | Subscribe the webhook to **messages**; check the sender's number is on their account under People. |
-| "Claude API key was rejected" | Copy the key again from console.anthropic.com; check there's credit under Billing. |
-| Photos not being checked | **Check photos with Claude** must be on, and the photo must have reached the server (the caretaker's phone synced). |
+| A task with a photo isn't in Review | The photo hasn't finished uploading. On the caretaker's phone, tap the sync badge to see the upload and retry. After 24 hours it appears in Review anyway, flagged. |
 
 Environment variables (`WA_TOKEN`, `WA_PHONE_ID`, `WA_APP_SECRET`,
-`WA_VERIFY_TOKEN`, `WA_API_VERSION`, `ANTHROPIC_API_KEY`, `VIM_MODE=claude`,
-`VIM_MODEL`, `VIM_MONTHLY_CAP_USD`) still work as defaults; settings saved in
+`WA_VERIFY_TOKEN`, `WA_API_VERSION`) still work as defaults; settings saved in
 the app take priority.

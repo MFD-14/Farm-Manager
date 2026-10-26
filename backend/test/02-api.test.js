@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 import { prepareDb, resetDynamic, tx, q, instancesByCode, getInstance } from "./helpers.js";
 import { createApp } from "../src/app.js";
 import { runRelease } from "../src/engine/release.js";
-import { processVimQueue } from "../src/workers/vim.js";
 
 const TODAY = "2026-08-03";
 let server, base, caretakerToken, ownerToken;
@@ -93,7 +92,7 @@ test("owner decision: reject reopens a needs_review task", async () => {
   assert.equal(after.rejection_count, 1);
 });
 
-test("media: initiate, chunked PATCH with offset recovery, complete triggers VIM", async () => {
+test("media: initiate, chunked PATCH with offset recovery; the stored photo sends the task for acceptance", async () => {
   await tx((c) => runRelease(c, TODAY));
   const [w01] = await instancesByCode("W-01");
   const mediaUuid = randomUUID();
@@ -139,11 +138,15 @@ test("media: initiate, chunked PATCH with offset recovery, complete triggers VIM
   const done = await api(`/api/media/${mediaUuid}/complete`, { method: "POST", token: caretakerToken });
   assert.equal(done.json.stored, true);
 
-  // VIM job exists; heuristic worker verifies
-  const jobs = (await q(`SELECT * FROM vim_jobs WHERE instance_id = $1`, [w01.id])).rows;
-  assert.equal(jobs.length, 1);
-  await processVimQueue();
-  assert.equal((await getInstance(w01.id)).state, "verified_closed");
+  // Photo logged with the task; it waits for an owner or task manager to accept.
+  assert.equal((await getInstance(w01.id)).state, "needs_review");
+  const queue = await api("/api/instances?state=decisions", { token: ownerToken });
+  const card = queue.json.instances.find((i) => i.id === w01.id);
+  assert.equal(card.ready_to_accept, true);
+  assert.equal(card.media[0].media_uuid, mediaUuid);
+  const accept = await api(`/api/instances/${w01.id}/decision`, { method: "POST", token: ownerToken, body: { action: "accept" } });
+  assert.equal(accept.json.state, "verified_closed");
+  assert.equal((await getInstance(w01.id)).verification.method, "accepted");
 });
 
 test("whatsapp webhook: Done button appends done_reported; inbound is idempotent", async () => {

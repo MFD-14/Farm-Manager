@@ -88,6 +88,7 @@ function PersonForm({ initial, isMe, onSaved, onCancel }) {
         <label>Role</label>
         <select value={f.role} onChange={set("role")} disabled={isMe}>
           <option value="caretaker">Caretaker: daily tasks and evidence</option>
+          <option value="manager">Task manager: accepts completed tasks, sees the console</option>
           <option value="owner">Owner (admin): everything, including People</option>
         </select>
       </div>

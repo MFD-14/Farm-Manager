@@ -11,6 +11,7 @@ import AboutSheet from "./components/AboutSheet.jsx";
 import AccountSheet, { PasswordForm } from "./components/AccountSheet.jsx";
 import PeopleSheet from "./components/PeopleSheet.jsx";
 import ConnectionsSheet from "./components/ConnectionsSheet.jsx";
+import SyncSheet from "./components/SyncSheet.jsx";
 
 // Barn outline for the Farm tab.
 const FARM_ICON = "M3 21V10l9-6 9 6v11M9 21v-6h6v6M3 21h18";
@@ -34,6 +35,7 @@ export default function App() {
   const [showAccount, setShowAccount] = useState(false);
   const [showPeople, setShowPeople] = useState(false);
   const [showConnections, setShowConnections] = useState(false);
+  const [showSync, setShowSync] = useState(false);
   const [notice, setNotice] = useState(null);
   const [oneTime, setOneTime] = useState(""); // kept in memory only
   const [waiting, setWaiting] = useState(0); // sign-ups awaiting an owner
@@ -85,7 +87,7 @@ export default function App() {
     setOneTime(r.user.must_change_password ? password : "");
     setNotice(null);
     setUser(r.user);
-    if (r.user.role !== "owner") await pullBundle().catch(() => {});
+    await pullBundle().catch(() => {});
   }
 
   // Owners see a dot on the account button when someone has signed up.
@@ -132,6 +134,9 @@ export default function App() {
 
   const pending = counts.events + counts.media;
   const isOwner = user.role === "owner";
+  // Owners and task managers get the console (review queue, digest, KPIs);
+  // only owners administer people and WhatsApp.
+  const isConsole = isOwner || user.role === "manager";
 
   return (
     <>
@@ -145,14 +150,16 @@ export default function App() {
           </div>
           <div>
             <div className="brand">Woodlands</div>
-            <div className="sub">{isOwner ? "Owner console" : "Farm Manager"}</div>
+            <div className="sub">{isOwner ? "Owner console" : isConsole ? "Task manager" : "Farm Manager"}</div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {!online && <span className="badge offline">offline</span>}
-          <span className={`badge ${pending ? "sync-pending" : "sync-ok"}`}>
-            {syncing ? "syncing…" : pending ? `${pending} unsynced` : "synced"}
-          </span>
+          <button type="button" className="sync-badge-btn" aria-label="Sync and uploads" onClick={() => setShowSync(true)}>
+            <span className={`badge ${pending ? "sync-pending" : "sync-ok"}`}>
+              {syncing ? "syncing…" : pending ? `${pending} unsynced` : "synced"}
+            </span>
+          </button>
           <button className="about-btn" aria-label="My account"
             onClick={() => { setShowAccount(true); if (isOwner) refreshWaiting(); }}>
             {isOwner && waiting > 0 && <span className="dot" aria-label={`${waiting} waiting for approval`} />}
@@ -176,14 +183,15 @@ export default function App() {
       )}
       {showPeople && <PeopleSheet onClose={() => setShowPeople(false)} onPendingChanged={refreshWaiting} />}
       {showConnections && <ConnectionsSheet onClose={() => setShowConnections(false)} />}
+      {showSync && <SyncSheet online={online} onClose={() => { setShowSync(false); refreshCounts(); }} />}
       {tab === "farm" ? <FarmView />
-        : isOwner
+        : isConsole
           ? (tab === "rain" ? <RainView /> : tab === "water" ? <WaterView />
             : tab === "tasks" ? <DayView onCountsChanged={refreshCounts} /> : <OwnerView tab={tab} />)
           : (tab === "rain"
               ? <RainView onCaptureToday={() => setTab("day")} />
               : <DayView onCountsChanged={refreshCounts} />)}
-      {isOwner ? (
+      {isConsole ? (
         <nav className="tabs seven">
           <button className={tab === "day" ? "on" : ""} onClick={() => setTab("day")}>
             <TabIcon d="M3 3v18h18M7 16l4-8 4 4 4-6" />Digest

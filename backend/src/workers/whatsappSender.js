@@ -159,23 +159,25 @@ export async function sendMorningPlan(c, { user, instances }) {
   });
 }
 
-export async function sendRetakeRequest(c, { instance, reason }) {
+// An owner or task manager sent a task back: tell whoever does it, and why.
+export async function sendSentBack(c, { instance, reason }) {
   const s = await getIntegrations(c);
-  if (!s.whatsapp.retakes) return { status: "disabled" };
+  if (!s.whatsapp.sentBack) return { status: "disabled" };
   const user = await reminderRecipient(c, instance);
   if (!user) return { status: "skipped_no_phone" };
   return sendWhatsApp(c, {
-    toPhone: user.phone, kind: "retake", instanceId: instance.id,
-    text: `Please take the photo for ${taskLabel(instance)} again. Reason: ${reason}. ` +
-      "You can send it here as a reply, or retake it in the app.",
-    template: { key: "retake", params: [taskLabel(instance), reason] },
+    toPhone: user.phone, kind: "sent_back", instanceId: instance.id,
+    text: `${taskLabel(instance)} was sent back. Reason: ${reason}. ` +
+      "Please redo it and record it in the Woodlands app (you can send the photo here as a reply).",
+    template: { key: "sent_back", params: [taskLabel(instance), reason] },
   });
 }
 
 export async function sendOwnerAlert(c, { text, instanceId = null, kind = "owner_alert" }) {
   const s = await getIntegrations(c);
   if (!s.whatsapp.ownerAlerts) return [];
-  const owners = await waPeople(c, { role: "owner" });
+  // Owners and task managers both run the farm from the console.
+  const owners = [...await waPeople(c, { role: "owner" }), ...await waPeople(c, { role: "manager" })];
   const results = [];
   for (const o of owners) {
     results.push(await sendWhatsApp(c, {

@@ -7,7 +7,7 @@ import { runRelease } from "./engine/release.js";
 import { runEscalationSweep } from "./engine/escalation.js";
 import { evaluateRules } from "./engine/rules.js";
 import { sendDigest } from "./engine/digest.js";
-import { processVimQueue, vimOutageSweep } from "./workers/vim.js";
+import { acceptanceSweep } from "./workers/vim.js";
 import { runMorningPlan } from "./workers/morningPlan.js";
 import { fetchForecast } from "./workers/forecast.js";
 import { farmDateStr } from "./util/time.js";
@@ -42,7 +42,7 @@ async function main() {
       await tx((c) => runEscalationSweep(c));
       await tx((c) => evaluateRules(c));
       await tx((c) => runMorningPlan(c));
-      await processVimQueue();
+      await acceptanceSweep();
     } catch (e) { console.error("sweep failed", e); }
   }, TZ);
 
@@ -51,10 +51,6 @@ async function main() {
     try { await tx((c) => sendDigest(c)); } catch (e) { console.error("digest failed", e); }
   }, TZ);
 
-  // Hourly: VIM outage fallback sweep (spec 5.5).
-  cron.schedule("15 * * * *", async () => {
-    try { await vimOutageSweep(); } catch (e) { console.error("vim outage sweep failed", e); }
-  }, TZ);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { authRouter } from "./routes/auth.js";
 import { usersRouter } from "./routes/users.js";
 import { integrationsRouter } from "./routes/integrations.js";
+import { vimRouter } from "./routes/vim.js";
 import { syncRouter } from "./routes/sync.js";
 import { mediaRouter } from "./routes/media.js";
 import { planRouter, instancesRouter } from "./routes/instances.js";
@@ -46,6 +47,7 @@ export function createApp() {
   app.use("/api/auth", authRouter);
   app.use("/api/users", usersRouter);
   app.use("/api/integrations", integrationsRouter);
+  app.use("/api/vim", vimRouter);
   app.use("/api/sync", syncRouter);
   app.use("/api/media", mediaRouter);
   app.use("/api/plan", planRouter);

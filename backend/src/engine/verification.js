@@ -55,91 +55,49 @@ export async function routeAfterDoneReported(c, instance, policy, evidenceCheck,
     return;
   }
 
-  // All required media attached. Queue VIM jobs for blobs that exist server-side;
-  // ones still uploading are queued by the completion handler.
-  const vimProfile = policy.vim_profile;
-  if (vimProfile) {
-    let queued = 0;
-    for (const m of instance.evidence_summary?.media || []) {
-      const exists = await c.query(`SELECT 1 FROM media_objects WHERE media_uuid = $1`, [m.media_uuid]);
-      if (!exists.rows.length) continue;
-      await c.query(
-        `INSERT INTO vim_jobs (media_uuid, instance_id, profile, context)
-         SELECT $1, $2, $3, $4
-         WHERE NOT EXISTS (SELECT 1 FROM vim_jobs WHERE media_uuid = $1 AND instance_id = $2)`,
-        [m.media_uuid, instance.id, vimProfile,
-         { task_code: instance.template_code, subject: instance.subject_id, expected: instance.params?.expected || {} }]);
-      queued += 1;
-    }
-    // Stays at done_reported until verdicts arrive.
-    return;
-  }
-  // Media required but no VIM profile: auto-verify on presence.
-  await appendSystemEvent(c, instance.id, "auto_verified", {
-    verification: { method: "media_present", verdict: "pass", confidence: 1 },
+  // All required evidence is in. Photos, video and voice notes are not
+  // machine-checked (owner decision, Oct 2026): the task waits in the
+  // acceptance queue until an owner or task manager accepts it or sends it back.
+  // Photos attached offline can be reported before their bytes arrive: wait
+  // ("evidence uploading") until every file is on the server, so nobody is asked
+  // to accept a task whose photo they can't see. The media completion handler
+  // and the acceptance sweep re-run this routing.
+  const media = instance.evidence_summary?.media || [];
+  const uuids = media.map((m) => m.media_uuid).filter(Boolean);
+  const stored = uuids.length
+    ? (await c.query(`SELECT count(*)::int AS n FROM media_objects WHERE media_uuid = ANY($1) AND status = 'stored'`, [uuids])).rows[0].n
+    : 0;
+  if (stored < uuids.length) return;
+  await appendSystemEvent(c, instance.id, "review_required", {
+    flags: [{ kind: "awaiting_acceptance", media: media.length }],
   });
 }
 
-// Applied when a VIM verdict arrives (worker or webhook). Thresholds per spec 5.5.
+// Evidence that never finished uploading still reaches a person: after a day
+// the task goes to the queue flagged, rather than waiting out of sight.
+export async function flagMissingMedia(c, instance) {
+  const uuids = (instance.evidence_summary?.media || []).map((m) => m.media_uuid).filter(Boolean);
+  const stored = uuids.length
+    ? (await c.query(`SELECT count(*)::int AS n FROM media_objects WHERE media_uuid = ANY($1) AND status = 'stored'`, [uuids])).rows[0].n
+    : 0;
+  await appendSystemEvent(c, instance.id, "review_required", {
+    flags: [{ kind: "media_not_uploaded", expected: uuids.length, received: stored }],
+  });
+}
+
+// A task is "ready to accept" when the only reason it is waiting is the
+// acceptance step itself (no evidence shortfall, timing or physics flag).
+export function acceptanceOnly(flags) {
+  return Array.isArray(flags) && flags.length > 0 && flags.every((f) => f.kind === "awaiting_acceptance");
+}
+
+// Video Intelligence Module annotations (VIM v1.1 analyses field video). They
+// are advisory: stored and shown on the acceptance card next to the evidence,
+// never moving a task by themselves.
 export async function applyVimVerdict(c, verdict) {
   await c.query(
     `INSERT INTO vim_verdicts (media_uuid, instance_id, verdict, confidence, extracted, model_version)
      VALUES ($1,$2,$3,$4,$5,$6)`,
     [verdict.media_uuid, verdict.instance_id, verdict.verdict, verdict.confidence,
      verdict.extracted || {}, verdict.model_version || "unknown"]);
-
-  const { rows } = await c.query(`SELECT * FROM task_instances WHERE id = $1 FOR UPDATE`, [verdict.instance_id]);
-  if (!rows.length) return;
-  const instance = rows[0];
-  if (instance.state !== "done_reported") return; // already routed
-
-  // Wait until every attached media item with a queued/running job has a verdict.
-  const pending = await c.query(
-    `SELECT 1 FROM vim_jobs j WHERE j.instance_id = $1 AND j.status IN ('queued','running')
-     AND NOT EXISTS (SELECT 1 FROM vim_verdicts v WHERE v.media_uuid = j.media_uuid AND v.instance_id = j.instance_id)`,
-    [verdict.instance_id]);
-  if (pending.rows.length) return;
-
-  const { rows: verdicts } = await c.query(
-    `SELECT * FROM vim_verdicts WHERE instance_id = $1 ORDER BY decided_at`, [verdict.instance_id]);
-  const worst = verdicts.reduce((acc, v) => {
-    const rank = { pass: 0, uncertain: 1, fail: 2, unusable: 3 };
-    return rank[v.verdict] > rank[acc.verdict] ? v : acc;
-  }, verdicts[0]);
-  const minConf = Math.min(...verdicts.map((v) => Number(v.confidence)));
-
-  // A verifier that declined to assess is not a bad photo: straight to the owner.
-  const refused = verdicts.find((v) => v.extracted?.refused);
-  if (refused) {
-    await appendSystemEvent(c, instance.id, "review_required", {
-      flags: [{ kind: "vim_refused", extracted: refused.extracted }],
-    });
-    return;
-  }
-
-  if (worst.verdict === "pass" && minConf >= 0.8) {
-    await appendSystemEvent(c, instance.id, "auto_verified", {
-      verification: { method: "vim", verdict: "pass", confidence: minConf, extracted: worst.extracted },
-    });
-  } else if (worst.verdict === "unusable" || minConf < 0.5) {
-    // One retake before review (spec 5.5).
-    const already = instance.evidence_summary?.retake_requested;
-    if (!already) {
-      await c.query(
-        `UPDATE task_instances SET evidence_summary = evidence_summary || '{"retake_requested": true}', updated_at = now() WHERE id = $1`,
-        [instance.id]);
-      const reason = worst.extracted?.retake_hint || worst.extracted?.reason || "unusable media, please retake";
-      await appendSystemEvent(c, instance.id, "retake_requested", { reason });
-      // Tell the caretaker on WhatsApp too; the app shows it on next sync.
-      const { sendRetakeRequest } = await import("../workers/whatsappSender.js");
-      await sendRetakeRequest(c, { instance, reason }).catch(() => {});
-    } else {
-      await appendSystemEvent(c, instance.id, "review_required", { flags: [{ kind: "vim_unusable_after_retake" }] });
-    }
-  } else {
-    // fail, uncertain, or 0.50-0.79: owner adjudicates. Fail never auto-rejects.
-    await appendSystemEvent(c, instance.id, "review_required", {
-      flags: [{ kind: "vim", verdict: worst.verdict, confidence: minConf, extracted: worst.extracted }],
-    });
-  }
 }

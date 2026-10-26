@@ -8,6 +8,15 @@ import { farmDateStr } from "../util/time.js";
 
 export const syncRouter = Router();
 
+// Who may append what through sync. The actor is always derived from the
+// account, never taken from the phone: a caretaker's phone can report work but
+// can't accept it, and nobody can forge system events.
+const FIELD_EVENTS = new Set(["seen", "started", "field_recorded", "media_attached", "done_reported",
+  "skip_requested", "problem_flagged"]);
+const CONSOLE_EVENTS = new Set([...FIELD_EVENTS, "verified_closed", "rejected_reopened", "skip_approved",
+  "skip_denied", "unblocked", "cancelled", "reassigned", "corrected", "deferred"]);
+const roleActor = (role) => (role === "owner" || role === "admin" ? "owner" : role === "manager" ? "manager" : "caretaker");
+
 // POST /api/sync/events  — idempotent on event_uuid; duplicates are success.
 syncRouter.post("/events", auth(), async (req, res) => {
   const { device_id, device_now, events = [] } = req.body || {};
@@ -23,16 +32,21 @@ syncRouter.post("/events", auth(), async (req, res) => {
     await q(`UPDATE devices SET clock_skew_ms = $2, last_sync_at = now() WHERE id = $1`, [device_id, skewMs]);
   }
 
+  const allowed = ["owner", "admin", "manager"].includes(req.user.role) ? CONSOLE_EVENTS : FIELD_EVENTS;
   for (const e of events) {
     if (!e.event_uuid) {
       rejected.push({ event_uuid: null, reason: "missing event_uuid" });
+      continue;
+    }
+    if (!allowed.has(e.type)) {
+      rejected.push({ event_uuid: e.event_uuid, reason: `not allowed: ${e.type}` });
       continue;
     }
     try {
       const result = await tx((c) =>
         foldEvent(c, {
           ...e,
-          actor_type: e.actor_type || (req.user.role === "owner" ? "owner" : "caretaker"),
+          actor_type: roleActor(req.user.role),
           actor_id: req.user.id,
           device_id: device_id || req.user.deviceId,
         }));
@@ -54,7 +68,7 @@ syncRouter.post("/events", auth(), async (req, res) => {
   const serverEvents = await q(
     `SELECT event_uuid, instance_id, actor_type, type, payload, server_time
      FROM task_events
-     WHERE actor_type IN ('system','vim','owner') AND ($1::timestamptz IS NULL OR server_time > $1)
+     WHERE actor_type IN ('system','vim','owner','manager') AND ($1::timestamptz IS NULL OR server_time > $1)
      ORDER BY server_time LIMIT 500`,
     [cursor]);
 

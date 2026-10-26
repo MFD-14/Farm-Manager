@@ -23,20 +23,36 @@ export async function markSeen(instance) {
   return next;
 }
 
-export async function reportDone(instance, { fields = {}, mediaItems = [], urgent = false }) {
+// Queue each file for upload and log it against the task straight away; the
+// bytes follow whenever there's signal (uploads screen shows progress).
+async function queueItems(instance, mediaItems, urgent) {
   for (const m of mediaItems) {
     await queueMedia({
       media_uuid: m.media_uuid, instance_id: instance.id, kind: m.kind,
-      blob: m.blob, captured_at: new Date().toISOString(),
+      blob: m.blob, mime: m.blob?.type || null, source: m.source || "camera",
+      file_modified: m.file_modified || null, title: `${instance.template_code} ${instance.title}`,
+      captured_at: new Date().toISOString(),
       urgent: urgent || ["P0", "P1"].includes(instance.priority),
     });
-    await append(instance.id, "media_attached", { media_uuid: m.media_uuid, kind: m.kind });
+    await append(instance.id, "media_attached", { media_uuid: m.media_uuid, kind: m.kind, source: m.source || "camera" });
   }
+}
+
+export async function reportDone(instance, { fields = {}, mediaItems = [], urgent = false }) {
+  await queueItems(instance, mediaItems, urgent);
   if (Object.keys(fields).length) {
     await append(instance.id, "field_recorded", { fields });
   }
   await append(instance.id, "done_reported", { fields });
   return patchInstance(instance.id, { state: "done_reported", local_done: true });
+}
+
+// Extra photos, video or voice notes for a task at any point before it closes
+// (including while it waits for acceptance), online or not.
+export async function attachToTask(instance, mediaItems) {
+  await queueItems(instance, mediaItems, false);
+  const count = (instance.extra_uploads || 0) + mediaItems.length;
+  return patchInstance(instance.id, { extra_uploads: count });
 }
 
 export async function requestSkip(instance, reasonCode, note) {
@@ -48,7 +64,8 @@ export async function flagProblem(instance, reasonCode, note, voiceItem) {
   if (voiceItem) {
     await queueMedia({
       media_uuid: voiceItem.media_uuid, instance_id: instance.id, kind: "audio",
-      blob: voiceItem.blob, captured_at: new Date().toISOString(), urgent: true,
+      blob: voiceItem.blob, mime: voiceItem.blob?.type || null, source: "microphone",
+      title: `${instance.template_code} ${instance.title}`, captured_at: new Date().toISOString(), urgent: true,
     });
     await append(instance.id, "media_attached", { media_uuid: voiceItem.media_uuid, kind: "audio" });
   }
@@ -85,7 +102,7 @@ export function evidenceReady(policy, { fields = {}, photos = 0, videos = 0, voi
 
 // Compress a captured photo toward the 150-250 KB budget at 1280 px (spec 5.3),
 // stamping task code and datetime onto the image (spec 5.1).
-export async function compressAndStamp(file, { taskCode }) {
+export async function compressAndStamp(file, { taskCode, fromGallery = false }) {
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, 1280 / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
@@ -93,7 +110,10 @@ export async function compressAndStamp(file, { taskCode }) {
   canvas.height = Math.round(bitmap.height * scale);
   const ctx = canvas.getContext("2d");
   ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  const stamp = `${taskCode}  ${new Date().toISOString().slice(0, 16).replace("T", " ")}`;
+  // Gallery photos are stamped with the file's own date, marked as such, so
+  // an old picture can't pass as today's.
+  const when = fromGallery && file.lastModified ? new Date(file.lastModified) : new Date();
+  const stamp = `${taskCode}  ${when.toISOString().slice(0, 16).replace("T", " ")}${fromGallery ? "  (gallery)" : ""}`;
   ctx.font = `${Math.max(14, Math.round(canvas.width / 40))}px monospace`;
   ctx.fillStyle = "rgba(0,0,0,0.55)";
   const pad = 8;
@@ -103,4 +123,23 @@ export async function compressAndStamp(file, { taskCode }) {
   ctx.fillText(stamp, pad, canvas.height - 10);
   const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", 0.7));
   return blob;
+}
+
+// Voice note: a small MediaRecorder wrapper. Returns { stop(): Promise<Blob> }.
+export async function startVoiceNote() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const type = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"].find((t) => window.MediaRecorder?.isTypeSupported?.(t));
+  const rec = new MediaRecorder(stream, type ? { mimeType: type, audioBitsPerSecond: 24000 } : undefined);
+  const chunks = [];
+  rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  rec.start();
+  return {
+    stop: () => new Promise((resolve) => {
+      rec.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        resolve(new Blob(chunks, { type: rec.mimeType || "audio/webm" }));
+      };
+      rec.stop();
+    }),
+  };
 }

@@ -33,14 +33,11 @@ services:
       CARETAKER_PASSWORD: ${CARETAKER_PASSWORD:?set CARETAKER_PASSWORD in .env}
       FARM_TZ: Africa/Harare
       TANK_USABLE: ${TANK_USABLE:-80000}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      VIM_MODE: ${VIM_MODE:-heuristic}
       WA_TOKEN: ${WA_TOKEN:-}
       WA_PHONE_ID: ${WA_PHONE_ID:-}
       WA_VERIFY_TOKEN: ${WA_VERIFY_TOKEN:-change-me-verify}
       WA_APP_SECRET: ${WA_APP_SECRET:-}
-      VIM_MODEL: ${VIM_MODEL:-claude-opus-5-5}
-      VIM_MONTHLY_CAP_USD: ${VIM_MONTHLY_CAP_USD:-20}
+      VIM_WEBHOOK_SECRET: ${VIM_WEBHOOK_SECRET:-}
     ports:
       - "4000:4000"
     volumes:

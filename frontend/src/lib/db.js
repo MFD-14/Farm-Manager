@@ -1,16 +1,26 @@
-// Client persistence (spec 7.2 item 1): IndexedDB with three object stores —
-// plan, outbox_events, outbox_media — plus meta for cursors and identity.
-// Capture writes locally first and never blocks on network.
+// Client persistence (spec 7.2 item 1): IndexedDB object stores plan,
+// outbox_events, outbox_media and outbox_decisions (owner / task manager
+// decisions made offline), media_cache (evidence photos kept for offline
+// review), plus meta for cursors and identity. Capture writes locally first
+// and never blocks on network.
 import { openDB } from "idb";
 
-export const dbPromise = openDB("woodlands", 1, {
-  upgrade(db) {
-    db.createObjectStore("plan", { keyPath: "id" });
-    const ev = db.createObjectStore("outbox_events", { keyPath: "event_uuid" });
-    ev.createIndex("by_time", "queued_at");
-    const media = db.createObjectStore("outbox_media", { keyPath: "media_uuid" });
-    media.createIndex("by_time", "queued_at");
-    db.createObjectStore("meta");
+export const dbPromise = openDB("woodlands", 2, {
+  upgrade(db, oldVersion) {
+    if (oldVersion < 1) {
+      db.createObjectStore("plan", { keyPath: "id" });
+      const ev = db.createObjectStore("outbox_events", { keyPath: "event_uuid" });
+      ev.createIndex("by_time", "queued_at");
+      const media = db.createObjectStore("outbox_media", { keyPath: "media_uuid" });
+      media.createIndex("by_time", "queued_at");
+      db.createObjectStore("meta");
+    }
+    if (oldVersion < 2) {
+      const dec = db.createObjectStore("outbox_decisions", { keyPath: "event_uuid" });
+      dec.createIndex("by_time", "queued_at");
+      const cache = db.createObjectStore("media_cache", { keyPath: "media_uuid" });
+      cache.createIndex("by_time", "cached_at");
+    }
   },
 });
 
@@ -58,9 +68,9 @@ export async function removeEvents(uuids) {
 }
 
 export async function queueMedia(media) {
-  // media: {media_uuid, instance_id, kind, blob, queued_at}
+  // media: {media_uuid, instance_id, kind, blob, mime, source, title}
   const db = await dbPromise;
-  await db.put("outbox_media", { ...media, queued_at: Date.now(), offset: 0 });
+  await db.put("outbox_media", { ...media, queued_at: Date.now(), offset: 0, attempts: 0, last_error: null });
 }
 
 export async function pendingMedia() {
@@ -92,7 +102,34 @@ export async function metaSet(key, value) {
 export async function outboxCounts() {
   const db = await dbPromise;
   return {
-    events: await db.count("outbox_events"),
+    events: await db.count("outbox_events") + await db.count("outbox_decisions"),
     media: await db.count("outbox_media"),
   };
+}
+
+// Decisions made offline: replayed in order with their event_uuid, so a retry
+// never double-decides (the server treats a repeated id as a duplicate).
+export async function queueDecision(decision) {
+  const db = await dbPromise;
+  await db.put("outbox_decisions", { ...decision, queued_at: Date.now() });
+}
+export async function pendingDecisions() {
+  const db = await dbPromise;
+  return db.getAllFromIndex("outbox_decisions", "by_time");
+}
+export async function removeDecision(eventUuid) {
+  const db = await dbPromise;
+  await db.delete("outbox_decisions", eventUuid);
+}
+
+// Evidence photos fetched while online, kept for reviewing offline later.
+export async function cacheMediaBlob(mediaUuid, blob) {
+  const db = await dbPromise;
+  await db.put("media_cache", { media_uuid: mediaUuid, blob, cached_at: Date.now() });
+  const keys = await db.getAllKeysFromIndex("media_cache", "by_time");
+  for (const k of keys.slice(0, Math.max(0, keys.length - 150))) await db.delete("media_cache", k);
+}
+export async function cachedMediaBlob(mediaUuid) {
+  const db = await dbPromise;
+  return (await db.get("media_cache", mediaUuid))?.blob || null;
 }

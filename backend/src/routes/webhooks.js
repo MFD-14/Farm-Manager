@@ -10,6 +10,7 @@ import { applyVimVerdict, routeAfterDoneReported } from "../engine/verification.
 import { validateEvidence } from "../engine/evidence.js";
 import { sendReply } from "../workers/whatsappSender.js";
 import { getIntegrations } from "../integrations/settings.js";
+import { vimSecretOk } from "./vim.js";
 
 export const webhooksRouter = Router();
 
@@ -264,22 +265,15 @@ webhooksRouter.post("/whatsapp", async (req, res) => {
   }
 });
 
-// VIM verdict callback (spec 6.2) for an external verifier; identical contract
-// to the in-process consumer. A verdict can auto-approve a task, so the
-// endpoint is off unless VIM_WEBHOOK_SECRET is set and sent as x-vim-secret.
+// VIM v1.1 annotation callback (spec 5.5). Advisory: stored with the evidence
+// and shown on the acceptance card; never moves a task. Off unless
+// VIM_WEBHOOK_SECRET is set and sent as x-vim-secret.
 webhooksRouter.post("/vim", async (req, res) => {
-  const secret = process.env.VIM_WEBHOOK_SECRET;
-  const given = req.get("x-vim-secret") || "";
-  if (!secret || given.length !== secret.length || !timingSafeEqual(Buffer.from(given), Buffer.from(secret))) {
-    return res.status(403).json({ error: "forbidden" });
-  }
+  if (!vimSecretOk(req)) return res.status(403).json({ error: "forbidden" });
   const { media_uuid, instance_id, verdict, confidence, extracted, model_version } = req.body || {};
   if (!media_uuid || !verdict) return res.status(400).json({ error: "media_uuid and verdict required" });
   try {
     await tx(async (c) => {
-      await c.query(
-        `UPDATE vim_jobs SET status = 'done', updated_at = now() WHERE media_uuid = $1 AND instance_id = $2`,
-        [media_uuid, instance_id]);
       await applyVimVerdict(c, { media_uuid, instance_id, verdict, confidence, extracted, model_version });
     });
     res.json({ ok: true });

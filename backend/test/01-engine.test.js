@@ -8,7 +8,6 @@ import { runRelease } from "../src/engine/release.js";
 import { evaluateRules } from "../src/engine/rules.js";
 import { runEscalationSweep } from "../src/engine/escalation.js";
 import { rebuildProjections } from "../src/engine/fold.js";
-import { processVimQueue } from "../src/workers/vim.js";
 import { buildDigest } from "../src/engine/digest.js";
 import { computeKpis } from "../src/engine/kpis.js";
 import { farmDateStr, farmTime, addDays } from "../src/util/time.js";
@@ -150,7 +149,7 @@ test("fold: evidence-short done routes to needs_review, owner verifies", async (
   assert.equal(after.state, "verified_closed");
 });
 
-test("fold: media attach + VIM heuristic pass auto-verifies W-01", async () => {
+test("fold: photo evidence waits for acceptance, then an owner accepts W-01", async () => {
   await tx((c) => runRelease(c, TODAY));
   const [w01] = await instancesByCode("W-01");
   const mediaUuid = "22222222-2222-4222-8222-222222222222";
@@ -161,14 +160,14 @@ test("fold: media attach + VIM heuristic pass auto-verifies W-01", async () => {
   await appendEvent(w01.id, "media_attached", { media_uuid: mediaUuid, kind: "photo" });
   await appendEvent(w01.id, "done_reported", {});
   let after = await getInstance(w01.id);
-  assert.equal(after.state, "done_reported", "waits for VIM verdict");
-  const jobs = (await q(`SELECT * FROM vim_jobs WHERE instance_id = $1`, [w01.id])).rows;
-  assert.equal(jobs.length, 1);
-  assert.equal(jobs[0].profile, "tank_gauge");
-  await processVimQueue();
+  assert.equal(after.state, "needs_review", "photos are not machine-checked; waits for a person");
+  const flags = (await q(`SELECT payload FROM task_events WHERE instance_id = $1 AND type = 'review_required'`, [w01.id])).rows[0].payload.flags;
+  assert.deepEqual(flags, [{ kind: "awaiting_acceptance", media: 1 }]);
+  assert.equal((await q(`SELECT count(*)::int AS n FROM vim_jobs WHERE instance_id = $1`, [w01.id])).rows[0].n, 0);
+  const ownerUser = (await q(`SELECT * FROM users WHERE role = 'owner'`)).rows[0];
+  await appendEvent(w01.id, "verified_closed", { verification: { method: "accepted" } }, { actor_type: "owner", actor: ownerUser });
   after = await getInstance(w01.id);
   assert.equal(after.state, "verified_closed");
-  assert.equal(after.verification.method, "vim");
   // Readings projected
   const tank = (await q(`SELECT value FROM readings WHERE metric = 'tank_level_pct'`)).rows;
   assert.equal(Number(tank[0].value), 62);

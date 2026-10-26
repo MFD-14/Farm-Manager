@@ -18,8 +18,9 @@ core design decision, quoted from the spec:
 **Server:** free Google Cloud / Oracle Cloud setup with a one-command
 installer in [DEPLOY-FREE-CLOUD.md](DEPLOY-FREE-CLOUD.md).
 
-**WhatsApp reminders and Claude photo checking:** set up in the app; keys and
-steps in [WHATSAPP-AND-CLAUDE-SETUP.md](WHATSAPP-AND-CLAUDE-SETUP.md).
+**WhatsApp reminders:** set up in the app; keys and steps in
+[WHATSAPP-SETUP.md](WHATSAPP-SETUP.md). Evidence photos are accepted by an
+owner or task manager in the Review tab (no machine checking).
 
 **Phones:** see [INSTALL-PHONES.md](INSTALL-PHONES.md). Android APK:
 <https://github.com/MFD-14/Farm-Manager/releases/download/android-latest/woodlands.apk>
@@ -66,10 +67,13 @@ client-side and revalidated server-side; E0 random audit upgrades (1 in 7);
 deferred media (a task is verifiable-pending-media and caretaker timers stop at
 `done_reported`); resumable offset-based uploads; in-image stamping and pHash
 re-submission checks; physics checks (water balance, feed balance, harvest
-sanity, timing sanity with per-device clock skew); the VIM worker with nine
-verification profiles, the 0.80/0.50 confidence thresholds, one-retake flow and
-the outage sampling fallback. VIM runs heuristic by default and switches to
-Claude Vision with `VIM_MODE=claude` plus an API key.
+sanity, timing sanity with per-device clock skew). Evidence is not
+machine-checked: a task whose photos, video or voice notes have all uploaded
+waits in the Review queue until an owner or task manager accepts it (or sends
+it back with a reason, which reaches the caretaker on WhatsApp); "accept all"
+takes the clean ones in one tap. The Video Intelligence Module (VIM v1.1) pulls
+new field videos and posts advisory annotations that appear on the review card
+and never close a task.
 
 **Forecast feed.** Open-Meteo (no API key, free for non-commercial use, ~10k
 requests/day) is fetched daily at 04:15 farm time: 7-day precipitation, rain
@@ -155,7 +159,7 @@ node src/jobs/rebuild-projections.js   # replay the event log
 | Variable | Meaning |
 |----------|---------|
 | `TANK_USABLE` | Measured usable tank litres, entered after Phase 0 rehabilitation; parameterises trigger T1 and the water balance |
-| `VIM_MODE` + `ANTHROPIC_API_KEY` (+ `VIM_MODEL`, `VIM_MONTHLY_CAP_USD`) | Defaults for Claude photo checking; normally set in the app (owner: My account → WhatsApp & photo checking), which takes priority |
+| `VIM_WEBHOOK_SECRET` | Shared secret for the Video Intelligence Module (VIM v1.1) feed and annotation callback; off when unset |
 | `WA_TOKEN`, `WA_PHONE_ID`, `WA_APP_SECRET`, `WA_VERIFY_TOKEN` | Defaults for the WhatsApp Business Cloud API, likewise set in the app; the sender degrades to log-only without them |
 | `FARM_TZ` | Farm timezone, default `Africa/Harare` |
 | `FARM_LAT`, `FARM_LNG` | Farm coordinates for the forecast feed, default Kwekwe (-18.9281, 29.8149) |

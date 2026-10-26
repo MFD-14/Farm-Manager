@@ -1,19 +1,10 @@
-// Integration settings: WhatsApp Business Cloud API and Claude photo checking.
+// Integration settings: the WhatsApp Business Cloud API.
 // The owner enters them in the app; they are stored server-side in
 // farm_settings 'integrations' and environment variables act as defaults (so
 // existing .env deployments keep working). Secrets never leave the server:
 // publicView() returns only whether each is set and its last four characters.
 import { q } from "../db/pool.js";
 import { config } from "../config.js";
-
-export const CLAUDE_MODELS = {
-  // Per-million-token prices (USD) for the cost view and the monthly cap.
-  "claude-opus-5-5": { label: "Opus 5.5, most careful", input: 4, output: 20 },
-  "claude-sonnet-5-5": { label: "Sonnet 5.5, balanced", input: 2, output: 10 },
-  "claude-haiku-5-5": { label: "Haiku 5.5, cheapest", input: 0.10, output: 0.50 },
-};
-export const DEFAULT_CLAUDE_MODEL = "claude-opus-5-5";
-export const EFFORTS = ["low", "medium", "high"];
 
 // Message templates the owner creates once in WhatsApp Manager (category
 // Utility). Needed only for messages sent when the person hasn't messaged the
@@ -35,10 +26,10 @@ export const WA_TEMPLATES = {
     body: "Good morning {{1}}. You have {{2}} farm tasks today: {{3}}. Open the Woodlands app to see the details.",
     example: ["Tendai", "8", "W-01 Tank reading; P-01 Poultry feed; C-01 Kale harvest"],
   },
-  retake: {
-    name: "woodlands_photo_retake",
-    body: "Woodlands Farm: please take the photo for {{1}} again. Reason: {{2}}.",
-    example: ["W-01 Tank and pool level reading", "the gauge is not visible"],
+  sent_back: {
+    name: "woodlands_task_sent_back",
+    body: "Woodlands Farm: {{1}} was sent back. Reason: {{2}}. Please redo it and record it in the Woodlands app.",
+    example: ["W-01 Tank and pool level reading", "the gauge is not visible in the photo"],
   },
   // Meta's pre-approved sample template, available on every new number; used
   // by the owner's "Send test" button before the farm's own are approved.
@@ -62,18 +53,11 @@ const DEFAULTS = () => ({
     morningPlan: true,    // the day's task list each morning
     morningTime: "06:00", // farm time
     ownerAlerts: true,    // missed-twice and urgent alerts to owners
-    retakes: true,        // ask for a new photo when Claude can't use it
-  },
-  claude: {
-    apiKey: config.anthropicKey || "",
-    enabled: config.vimMode === "claude",
-    model: process.env.VIM_MODEL || DEFAULT_CLAUDE_MODEL,
-    effort: process.env.VIM_EFFORT || "medium",
-    monthlyCapUsd: Number(process.env.VIM_MONTHLY_CAP_USD || 20),
+    sentBack: true,       // tell the caretaker when a task is sent back
   },
 });
 
-const SECRET_KEYS = { whatsapp: ["token", "appSecret"], claude: ["apiKey"] };
+const SECRET_KEYS = { whatsapp: ["token", "appSecret"] };
 
 let cache = null;
 let cacheAt = 0;
@@ -96,37 +80,26 @@ export async function getIntegrations(client = null) {
     }
     return out;
   };
-  cache = { whatsapp: merge("whatsapp"), claude: merge("claude") };
-  if (!CLAUDE_MODELS[cache.claude.model]) cache.claude.model = DEFAULT_CLAUDE_MODEL;
-  if (!EFFORTS.includes(cache.claude.effort)) cache.claude.effort = "medium";
+  cache = { whatsapp: merge("whatsapp") };
   cacheAt = Date.now();
   return cache;
 }
 
 export const waConfigured = (s) => !!(s.whatsapp.token && s.whatsapp.phoneId);
-export const claudeActive = (s) => !!(s.claude.enabled && s.claude.apiKey);
 
 const hint = (v) => (v ? `…${String(v).slice(-4)}` : null);
 
 export function publicView(s) {
   const wa = { ...s.whatsapp };
-  const cl = { ...s.claude };
   for (const k of SECRET_KEYS.whatsapp) { wa[`${k}Set`] = !!wa[k]; wa[`${k}Hint`] = hint(wa[k]); delete wa[k]; }
-  for (const k of SECRET_KEYS.claude) { cl[`${k}Set`] = !!cl[k]; cl[`${k}Hint`] = hint(cl[k]); delete cl[k]; }
-  return {
-    whatsapp: { ...wa, configured: waConfigured(s) },
-    claude: { ...cl, active: claudeActive(s) },
-    models: CLAUDE_MODELS,
-    templates: WA_TEMPLATES,
-  };
+  return { whatsapp: { ...wa, configured: waConfigured(s) }, templates: WA_TEMPLATES };
 }
 
 // Partial update from the owner. For secrets: a non-empty string replaces,
 // null clears, an absent or empty field keeps what is stored.
 const ALLOWED = {
   whatsapp: ["token", "phoneId", "verifyToken", "appSecret", "apiVersion", "language",
-    "reminders", "morningPlan", "morningTime", "ownerAlerts", "retakes"],
-  claude: ["apiKey", "enabled", "model", "effort", "monthlyCapUsd"],
+    "reminders", "morningPlan", "morningTime", "ownerAlerts", "sentBack"],
 };
 
 export async function saveIntegrations(patch) {
@@ -148,14 +121,8 @@ export async function saveIntegrations(patch) {
       }
       if (typeof v === "string") v = v.trim();
       if (key === "morningTime" && !/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) throw badRequest("Morning time must look like 06:00");
-      if (key === "model" && !CLAUDE_MODELS[v]) throw badRequest("Unknown Claude model");
-      if (key === "effort" && !EFFORTS.includes(v)) throw badRequest("Effort must be low, medium or high");
-      if (key === "monthlyCapUsd") {
-        v = Number(v);
-        if (!Number.isFinite(v) || v < 0 || v > 1000) throw badRequest("Monthly cap must be between 0 and 1000 dollars");
-      }
       if (key === "apiVersion" && !/^v\d+\.\d+$/.test(v)) throw badRequest("API version must look like v23.0");
-      if (["reminders", "morningPlan", "ownerAlerts", "retakes", "enabled"].includes(key)) v = !!v;
+      if (["reminders", "morningPlan", "ownerAlerts", "sentBack"].includes(key)) v = !!v;
       next[key] = v;
     }
     stored[section] = next;

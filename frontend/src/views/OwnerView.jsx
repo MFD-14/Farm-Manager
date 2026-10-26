@@ -1,20 +1,61 @@
-// Owner console (spec 4.5, 6.2): exceptions-first digest, the decision queue
-// with claim-versus-evidence side by side, and the KPI board.
+// Owner console (spec 4.5, 6.2): exceptions-first digest, the review queue
+// where owners and task managers accept evidence, and the KPI board.
 import React, { useEffect, useState, useCallback } from "react";
-import { apiJson, mediaObjectUrl } from "../lib/api.js";
+import { apiJson, mediaBlob } from "../lib/api.js";
+import { queueDecision, pendingDecisions, cachedMediaBlob, cacheMediaBlob, metaGet, metaSet } from "../lib/db.js";
+import { drainOnce } from "../lib/sync.js";
 
-function EvidencePhoto({ mediaUuid }) {
+// Evidence from the server, kept on the phone after the first look so the
+// queue can be reviewed with no signal.
+function useMediaUrl(mediaUuid, { cache = true } = {}) {
   const [src, setSrc] = useState(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     let url = null;
     let cancelled = false;
-    mediaObjectUrl(mediaUuid)
-      .then((u) => { url = u; if (!cancelled) setSrc(u); })
-      .catch(() => {});
+    (async () => {
+      try {
+        let blob = await cachedMediaBlob(mediaUuid);
+        if (!blob) {
+          blob = await mediaBlob(mediaUuid);
+          if (cache) await cacheMediaBlob(mediaUuid, blob);
+        }
+        url = URL.createObjectURL(blob);
+        if (!cancelled) setSrc(url);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
     return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
-  }, [mediaUuid]);
-  if (!src) return <div className="evidence-note" style={{ padding: 12 }}>Loading photo…</div>;
-  return <img src={src} alt="" style={{ width: "100%", borderRadius: 10, marginTop: 8 }} />;
+  }, [mediaUuid, cache]);
+  return { src, failed };
+}
+
+function EvidencePhoto({ mediaUuid, onOpen }) {
+  const { src, failed } = useMediaUrl(mediaUuid);
+  if (failed) return <div className="ev-missing">Photo shows when online</div>;
+  if (!src) return <div className="ev-missing">Loading…</div>;
+  return <img className="ev-photo" src={src} alt="Evidence" onClick={() => onOpen?.(src)} />;
+}
+
+function EvidencePlayer({ mediaUuid, kind }) {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <button type="button" className="ev-play" onClick={() => setOpen(true)}>
+        {kind === "video" ? "▶ Play video" : "▶ Play voice note"}
+      </button>
+    );
+  }
+  return <PlayerInner mediaUuid={mediaUuid} kind={kind} />;
+}
+function PlayerInner({ mediaUuid, kind }) {
+  const { src, failed } = useMediaUrl(mediaUuid, { cache: kind === "audio" });
+  if (failed) return <div className="ev-missing">Plays when online</div>;
+  if (!src) return <div className="ev-missing">Loading…</div>;
+  return kind === "video"
+    ? <video className="ev-video" src={src} controls playsInline />
+    : <audio src={src} controls style={{ width: "100%" }} />;
 }
 
 export default function OwnerView({ tab }) {
@@ -69,98 +110,193 @@ function Digest() {
   );
 }
 
+const FLAG_TEXT = {
+  awaiting_acceptance: null,
+  evidence_short: "Readings or details missing",
+  media_not_uploaded: "Photo or video never finished uploading",
+  timing_sanity: "Timing looks wrong (done too fast, or the clock was off)",
+  harvest_sanity: "Harvest count far from the usual",
+  phash_match: "Same photo as an earlier task",
+  vim_unusable_after_retake: "Evidence unusable after a retake",
+};
+const SEND_BACK_REASONS = ["Photo unclear", "Wrong place or item", "Readings missing", "Not done properly"];
+
+function flagLines(flags = []) {
+  return (flags || []).map((f) => FLAG_TEXT[f.kind] === undefined ? f.kind.replaceAll("_", " ") : FLAG_TEXT[f.kind]).filter(Boolean);
+}
+
+function when(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return d.toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function DecisionCard({ item, onDecide, onDetail, onZoom }) {
+  const [mode, setMode] = useState(null); // null | "send_back"
+  const [reason, setReason] = useState("");
+  const photos = (item.media || []).filter((m) => m.kind === "photo");
+  const players = (item.media || []).filter((m) => m.kind !== "photo");
+  const fields = Object.entries(item.evidence_summary?.fields || {});
+  const flags = flagLines(item.review_flags);
+  return (
+    <div className="card dcard" data-priority={item.priority}>
+      <div className="row">
+        <h3>{item.title}</h3>
+        <span className={`chip ${item.priority}`}>{item.priority}</span>
+      </div>
+      <div className="meta">
+        <span>{item.template_code}</span>
+        {item.reported?.by && <span>by {item.reported.by}</span>}
+        {item.reported?.at && <span>{when(item.reported.at)}</span>}
+        {item.reported?.via === "whatsapp" && <span>via WhatsApp</span>}
+      </div>
+      {flags.length > 0 && <div className="dflags">{flags.map((f) => <div key={f}>⚠ {f}</div>)}</div>}
+      {fields.length > 0 && (
+        <div className="dfields">{fields.map(([k, v]) => <span key={k}><b>{String(v)}</b> {k.replaceAll("_", " ")}</span>)}</div>
+      )}
+      {photos.length > 0 && (
+        <div className="ev-grid">{photos.map((m) => (
+          m.status === "stored"
+            ? <EvidencePhoto key={m.media_uuid} mediaUuid={m.media_uuid} onOpen={onZoom} />
+            : <div key={m.media_uuid} className="ev-missing">Still uploading</div>
+        ))}</div>
+      )}
+      {players.map((m) => (m.status === "stored"
+        ? <EvidencePlayer key={m.media_uuid} mediaUuid={m.media_uuid} kind={m.kind} />
+        : <div key={m.media_uuid} className="ev-missing">{m.kind === "video" ? "Video" : "Voice note"} still uploading</div>))}
+      {(item.vim || []).map((v, i) => (
+        <div className="dvim" key={i}>VIM: {v.verdict}{v.note ? `, ${v.note}` : ""}</div>
+      ))}
+      {item.state === "skip_pending" && <div className="dflags"><div>Skip requested</div></div>}
+      {item.state === "blocked" && <div className="dflags"><div>Problem reported</div></div>}
+
+      {mode === "send_back" ? (
+        <div className="sendback">
+          <div className="chips-row">{SEND_BACK_REASONS.map((r) => (
+            <button type="button" key={r} className={`chip-btn ${reason === r ? "on" : ""}`} onClick={() => setReason(r)}>{r}</button>
+          ))}</div>
+          <input className="sendback-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Or type the reason…" />
+          <div className="person-actions">
+            <button type="button" className="btn danger" disabled={!reason.trim()} onClick={() => onDecide(item, "send_back", reason.trim())}>Send back</button>
+            <button type="button" className="btn ghost" onClick={() => setMode(null)}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <div className="person-actions">
+          {item.state === "needs_review" && <>
+            <button type="button" className="btn primary" onClick={() => onDecide(item, "accept")}>Accept</button>
+            <button type="button" className="btn ghost" onClick={() => setMode("send_back")}>Send back</button>
+          </>}
+          {item.state === "skip_pending" && <>
+            <button type="button" className="btn primary" onClick={() => onDecide(item, "approve_skip")}>Approve skip</button>
+            <button type="button" className="btn ghost" onClick={() => onDecide(item, "deny_skip")}>Deny</button>
+          </>}
+          {item.state === "blocked" && (
+            <button type="button" className="btn primary" onClick={() => onDecide(item, "unblock")}>Problem solved</button>
+          )}
+          <button type="button" className="btn ghost" onClick={() => onDetail(item)}>History</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Decisions() {
   const [items, setItems] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [zoom, setZoom] = useState(null);
+  const [offline, setOffline] = useState(false);
+  const [queued, setQueued] = useState(0);
+  const [confirmAll, setConfirmAll] = useState(false);
 
-  const refresh = useCallback(() => {
-    apiJson("/api/instances?state=decisions").then((r) => setItems(r.instances)).catch(() => setItems([]));
+  const refresh = useCallback(async () => {
+    const pending = new Set((await pendingDecisions()).map((d) => d.instance_id));
+    setQueued(pending.size);
+    try {
+      const r = await apiJson("/api/instances?state=decisions");
+      await metaSet("decision_queue", r.instances);
+      setItems(r.instances.filter((i) => !pending.has(i.id)));
+      setOffline(false);
+    } catch {
+      const cached = (await metaGet("decision_queue")) || [];
+      setItems(cached.filter((i) => !pending.has(i.id)));
+      setOffline(true);
+    }
   }, []);
-  useEffect(refresh, [refresh]);
+  useEffect(() => { refresh(); }, [refresh]);
 
-  async function decide(id, action, note) {
-    await apiJson(`/api/instances/${id}/decision`, { method: "POST", body: { action, note } });
-    setDetail(null);
-    refresh();
+  // Decisions go through the outbox, so they work with no signal and replay
+  // safely; the card leaves the queue at once.
+  async function decide(item, action, note) {
+    await queueDecision({ event_uuid: crypto.randomUUID(), instance_id: item.id, action, note: note || null,
+      title: `${item.template_code} ${item.title}` });
+    setItems((p) => p.filter((i) => i.id !== item.id));
+    setQueued((n) => n + 1);
+    drainOnce().then(refresh).catch(() => {});
+  }
+  async function acceptAll(ready) {
+    setConfirmAll(false);
+    for (const item of ready) {
+      await queueDecision({ event_uuid: crypto.randomUUID(), instance_id: item.id, action: "accept", note: null,
+        title: `${item.template_code} ${item.title}` });
+    }
+    const ids = new Set(ready.map((i) => i.id));
+    setItems((p) => p.filter((i) => !ids.has(i.id)));
+    drainOnce().then(refresh).catch(() => {});
   }
 
   if (!items) return <div className="empty">Loading…</div>;
+  const ready = items.filter((i) => i.ready_to_accept);
+  const look = items.filter((i) => i.state === "needs_review" && !i.ready_to_accept);
+  const skips = items.filter((i) => i.state === "skip_pending");
+  const blocked = items.filter((i) => i.state === "blocked");
+  const props = { onDecide: decide, onDetail: (i) => apiJson(`/api/instances/${i.id}`).then(setDetail).catch(() => {}), onZoom: setZoom };
+
   return (
     <div className="wrap">
-      <div className="daytitle">Decision queue</div>
-      {items.length === 0 && <div className="empty">Queue is clear.</div>}
-      {items.map((i) => (
-        <div className="card" key={i.id} data-priority={i.priority} onClick={() => {
-          apiJson(`/api/instances/${i.id}`).then(setDetail);
-        }}>
-          <div className="row">
-            <h3>{i.title}</h3>
-            <span className={`chip state-${i.state}`}>{i.state.replaceAll("_", " ")}</span>
-          </div>
-          <div className="meta"><span>{i.template_code}</span><span className={`chip ${i.priority}`}>{i.priority}</span></div>
-        </div>
-      ))}
+      <div className="daytitle">Review</div>
+      {offline && <div className="retake">No signal: showing the queue from your last sync. Decisions are saved and sent later.</div>}
+      {queued > 0 && <div className="instructions">{queued} decision{queued === 1 ? "" : "s"} waiting to sync.</div>}
+      {items.length === 0 && <div className="empty">Nothing waiting. Tasks with photos land here for you to accept.</div>}
+
+      {ready.length > 0 && (
+        <>
+          <div className="section-title">Ready to accept · {ready.length}</div>
+          {ready.length > 1 && (confirmAll ? (
+            <div className="card">
+              <p className="form-msg" style={{ marginTop: 0 }}>Accept all {ready.length} tasks as complete? Check the photos first if unsure.</p>
+              <div className="person-actions">
+                <button type="button" className="btn primary" onClick={() => acceptAll(ready)}>Accept all {ready.length}</button>
+                <button type="button" className="btn ghost" onClick={() => setConfirmAll(false)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="btn ghost block" onClick={() => setConfirmAll(true)}>Accept all {ready.length}…</button>
+          ))}
+          {ready.map((i) => <DecisionCard key={i.id} item={i} {...props} />)}
+        </>
+      )}
+      {look.length > 0 && <><div className="section-title">Needs a closer look · {look.length}</div>{look.map((i) => <DecisionCard key={i.id} item={i} {...props} />)}</>}
+      {skips.length > 0 && <><div className="section-title">Skip requests · {skips.length}</div>{skips.map((i) => <DecisionCard key={i.id} item={i} {...props} />)}</>}
+      {blocked.length > 0 && <><div className="section-title">Problems reported · {blocked.length}</div>{blocked.map((i) => <DecisionCard key={i.id} item={i} {...props} />)}</>}
+
+      {zoom && <div className="zoom" onClick={() => setZoom(null)}><img src={zoom} alt="Evidence" /></div>}
       {detail && (
         <div className="sheet" onClick={() => setDetail(null)}>
           <div className="panel" onClick={(e) => e.stopPropagation()}>
             <h2>{detail.instance.title}</h2>
-            <div className="code">{detail.instance.template_code} · {detail.instance.state}</div>
-
-            <div className="section-title">Caretaker claim</div>
-            <div className="card">
-              {Object.entries(detail.instance.evidence_summary?.fields || {}).map(([k, v]) => (
-                <div className="kv" key={k}><span>{k}</span><b>{String(v)}</b></div>
-              ))}
-              {(detail.media || []).filter((m) => m.status === "stored" && m.kind === "photo").map((m) => (
-                <EvidencePhoto key={m.media_uuid} mediaUuid={m.media_uuid} />
-              ))}
-            </div>
-
-            {(detail.verdicts || []).length > 0 && (
-              <>
-                <div className="section-title">Machine verdicts</div>
-                {detail.verdicts.map((v, i) => (
-                  <div className="verdict" key={i}>
-                    <div className="kv">
-                      <span>{v.extracted?.engine === "claude" ? `Claude (${v.extracted.model || v.model_version})` : v.model_version}</span>
-                      <b>{v.verdict} · {Math.round(v.confidence * 100)}%</b>
-                    </div>
-                    {v.extracted?.reason && <p className="verdict-reason">{v.extracted.reason}</p>}
-                    {v.extracted?.matches_report && v.extracted.matches_report !== "nothing_reported" && (
-                      <div className="verdict-meta">Matches what was reported: {v.extracted.matches_report}</div>
-                    )}
-                    {(v.extracted?.readings || []).length > 0 && (
-                      <div className="verdict-meta">Read from photo: {v.extracted.readings.map((r) => `${r.name} ${r.value}`).join(", ")}</div>
-                    )}
-                  </div>
-                ))}
-              </>
-            )}
-
-            <div className="section-title">Events</div>
+            <div className="code">{detail.instance.template_code} · {detail.instance.state.replaceAll("_", " ")}</div>
+            <div className="section-title">History</div>
             {(detail.events || []).map((e) => (
               <div className="kv" key={e.event_uuid}>
-                <span>{e.type.replaceAll("_", " ")}</span>
+                <span>{e.type.replaceAll("_", " ")}{e.actor_type !== "system" ? ` · ${e.actor_type}` : ""}{e.payload?.note ? `: ${e.payload.note}` : ""}</span>
                 <span style={{ color: "var(--tm)", fontSize: 12 }}>
                   {new Date(e.server_time).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
             ))}
-
-            <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
-              {detail.instance.state === "needs_review" && <>
-                <button className="btn primary" style={{ flex: 1 }} onClick={() => decide(detail.instance.id, "verify")}>Approve</button>
-                <button className="btn danger" style={{ flex: 1 }} onClick={() => decide(detail.instance.id, "reject")}>Reject</button>
-              </>}
-              {detail.instance.state === "skip_pending" && <>
-                <button className="btn primary" style={{ flex: 1 }} onClick={() => decide(detail.instance.id, "approve_skip")}>Approve skip</button>
-                <button className="btn danger" style={{ flex: 1 }} onClick={() => decide(detail.instance.id, "deny_skip")}>Deny skip</button>
-              </>}
-              {detail.instance.state === "blocked" && (
-                <button className="btn primary" style={{ flex: 1 }} onClick={() => decide(detail.instance.id, "unblock")}>Unblock</button>
-              )}
-              <button className="btn ghost" style={{ flex: 1 }} onClick={() => decide(detail.instance.id, "cancel")}>Cancel task</button>
-            </div>
+            <button type="button" className="btn ghost block" onClick={() => { props.onDecide(detail.instance, "cancel"); setDetail(null); }}>Cancel this task</button>
+            <button type="button" className="btn ghost block" onClick={() => setDetail(null)}>Close</button>
           </div>
         </div>
       )}

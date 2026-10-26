@@ -223,12 +223,13 @@ test("owner settings: secrets never come back, test message reports how it was s
     body: JSON.stringify({ email: "owner@woodlands.farm", password: "woodlands" }) }).then((r) => r.json());
   const h = { "Content-Type": "application/json", Authorization: `Bearer ${owner.token}` };
   const save = await fetch(`${base}/api/integrations`, { method: "POST", headers: h,
-    body: JSON.stringify({ whatsapp: { token: "EAAsecret1234", phoneId: "555" }, claude: { apiKey: "sk-ant-abcd9876", enabled: true } }) })
+    body: JSON.stringify({ whatsapp: { token: "EAAsecret1234", phoneId: "555", appSecret: "appsec9876" } }) })
     .then((r) => r.json());
   assert.equal(save.whatsapp.tokenSet, true);
   assert.equal(save.whatsapp.tokenHint, "…1234");
-  assert.equal(save.claude.apiKeyHint, "…9876");
-  assert.ok(!JSON.stringify(save).includes("EAAsecret1234") && !JSON.stringify(save).includes("sk-ant-abcd9876"));
+  assert.equal(save.whatsapp.appSecretHint, "…9876");
+  assert.ok(!JSON.stringify(save).includes("EAAsecret1234") && !JSON.stringify(save).includes("appsec9876"));
+  assert.equal(save.claude, undefined, "no photo-checking settings any more");
   assert.match(save.webhook_url, /\/api\/webhooks\/whatsapp$/);
   assert.ok(save.whatsapp.verifyToken);
 

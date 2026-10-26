@@ -95,3 +95,9 @@ export async function mediaObjectUrl(mediaUuid) {
   const resp = await api(`/api/media/${mediaUuid}`);
   return URL.createObjectURL(await resp.blob());
 }
+
+// Evidence bytes, for keeping on the phone (offline review).
+export async function mediaBlob(mediaUuid) {
+  const resp = await api(`/api/media/${mediaUuid}`);
+  return resp.blob();
+}

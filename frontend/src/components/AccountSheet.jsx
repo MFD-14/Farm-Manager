@@ -95,7 +95,8 @@ export default function AccountSheet({ user, pending, waiting = 0, onClose, onUs
     <div className="sheet" onClick={onClose}>
       <div className="panel" onClick={(e) => e.stopPropagation()}>
         <h2>My account</h2>
-        <div className="code">{user.role === "owner" ? "Owner · full admin access" : "Caretaker"}</div>
+        <div className="code">{user.role === "owner" ? "Owner · full admin access"
+          : user.role === "manager" ? "Task manager · accepts completed tasks" : "Caretaker"}</div>
 
         {user.role === "owner" && onOpenPeople && (
           <button type="button" className="people-entry" onClick={onOpenPeople}>
@@ -113,8 +114,8 @@ export default function AccountSheet({ user, pending, waiting = 0, onClose, onUs
         {user.role === "owner" && onOpenConnections && (
           <button type="button" className="people-entry" onClick={onOpenConnections}>
             <span>
-              <b>WhatsApp & photo checking</b>
-              <small>WhatsApp reminders for the caretaker, and Claude checking evidence photos</small>
+              <b>WhatsApp</b>
+              <small>Reminders, the morning task list and sent-back notices for the caretaker; alerts for you</small>
             </span>
             <span aria-hidden="true">›</span>
           </button>
@@ -142,8 +143,8 @@ export default function AccountSheet({ user, pending, waiting = 0, onClose, onUs
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. 0771234567" autoComplete="tel" />
           </div>
           <label className="toggle-row">
-            <span><b>WhatsApp messages from the farm</b><small>{user.role === "owner"
-              ? "Alerts and the evening digest" : "Task reminders and the morning task list"}</small></span>
+            <span><b>WhatsApp messages from the farm</b><small>{user.role === "caretaker"
+              ? "Task reminders and the morning task list" : "Alerts and the evening digest"}</small></span>
             <input type="checkbox" checked={waOptIn} onChange={(e) => setWaOptIn(e.target.checked)} />
           </label>
           {msg && <p className={`form-msg ${msg.ok ? "good" : "bad"}`}>{msg.text}</p>}

@@ -11,7 +11,7 @@ import { normalizePhone } from "../util/phone.js";
 
 export const usersRouter = Router();
 
-export const ROLES = ["owner", "caretaker"];
+export const ROLES = ["owner", "manager", "caretaker"];
 
 export function publicUser(u) {
   return {
@@ -95,7 +95,7 @@ usersRouter.post("/", async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!String(name || "").trim()) return res.status(400).json({ error: "Name is required" });
   if (!validEmail(email)) return res.status(400).json({ error: "That doesn't look like an email address" });
-  if (!ROLES.includes(role)) return res.status(400).json({ error: "Role must be owner or caretaker" });
+  if (!ROLES.includes(role)) return res.status(400).json({ error: "Role must be owner, manager or caretaker" });
   // A password the owner types is the person's password; a generated one is
   // temporary and must be replaced at first sign-in.
   const given = req.body?.password ? String(req.body.password) : null;
@@ -133,7 +133,7 @@ usersRouter.patch("/:id", async (req, res) => {
   if (!next.name) return res.status(400).json({ error: "Name can't be empty" });
   if (!validEmail(next.email)) return res.status(400).json({ error: "That doesn't look like an email address" });
   if (!ROLES.includes(next.role) && next.role !== cur.role) {
-    return res.status(400).json({ error: "Role must be owner or caretaker" });
+    return res.status(400).json({ error: "Role must be owner, manager or caretaker" });
   }
   if (isMe && (next.role !== cur.role || !next.active)) {
     return res.status(400).json({ error: "You can't change your own role or switch off your own account" });

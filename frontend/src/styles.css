@@ -408,3 +408,54 @@ button { font-family:var(--fb); cursor:pointer; }
 .verdict { padding:6px 0 10px; border-bottom:1px solid var(--bl); }
 .verdict-reason { font-size:13.5px; color:var(--tx); margin:4px 0 2px; line-height:1.45; }
 .verdict-meta { font-size:12.5px; color:var(--tm); margin-top:2px; }
+
+/* ── Attachments ─────────────────────────────────────────── */
+.attach-btns { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+.attach-btn { display:flex; flex-direction:column; align-items:center; gap:3px; padding:11px 4px; border-radius:12px;
+  border:1.5px solid var(--bd); background:var(--sf); font-family:var(--fb); font-size:12.5px; font-weight:700; color:var(--ts); }
+.attach-btn span { font-size:20px; line-height:1; }
+.attach-btn.need { border-color:var(--gold); background:#fffaf0; }
+.attach-btn.rec { border-color:var(--r4); background:var(--r1); color:var(--r5); }
+.attach-btn:active { transform:scale(.97); }
+.photo-strip .thumb { position:relative; border:none; padding:0; background:none; }
+.photo-strip .thumb span { position:absolute; top:2px; right:4px; color:#fff; font-weight:700; text-shadow:0 1px 3px rgba(0,0,0,.6); }
+.attach-item { display:flex; justify-content:space-between; align-items:center; font-size:13px; color:var(--ts);
+  padding:8px 10px; background:var(--bl); border-radius:10px; margin-top:6px; }
+.attach-item .link-btn { margin:0; }
+
+/* ── Sync & uploads ──────────────────────────────────────── */
+.sync-badge-btn { background:none; border:none; padding:0; cursor:pointer; }
+.sync-row { display:flex; flex-direction:column; gap:3px; padding:12px 14px; }
+.sync-row small { color:var(--tm); font-size:12px; }
+.upload { padding:12px 14px; }
+.upload-head { display:flex; justify-content:space-between; font-size:14px; }
+.upload-head span { color:var(--tm); font-size:12.5px; }
+.upload-task { font-size:12.5px; color:var(--ts); margin-top:2px; }
+.upload-bar { height:6px; border-radius:3px; background:var(--bl); margin-top:8px; overflow:hidden; }
+.upload-bar div { height:100%; background:var(--g5); transition:width .3s ease; }
+.upload-meta { display:flex; flex-direction:column; gap:2px; font-size:12px; color:var(--tm); margin-top:5px; }
+.upload-meta .act-err { color:var(--r5); }
+
+/* ── Review queue ────────────────────────────────────────── */
+.dcard { padding:14px 15px; }
+.dflags { background:#fffaf0; border:1px solid #f3dfae; border-radius:10px; padding:8px 10px; margin-top:8px;
+  font-size:13px; color:#92400e; display:flex; flex-direction:column; gap:3px; }
+.dfields { display:flex; flex-wrap:wrap; gap:6px 12px; margin-top:8px; font-size:13px; color:var(--ts); }
+.dfields b { color:var(--tx); font-size:15px; }
+.ev-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; margin-top:10px; }
+.ev-photo { width:100%; aspect-ratio:4/3; object-fit:contain; background:#1a1209; border-radius:10px; display:block; cursor:zoom-in; }
+.ev-missing { aspect-ratio:4/3; display:flex; align-items:center; justify-content:center; text-align:center; padding:8px;
+  background:var(--bl); border-radius:10px; font-size:12px; color:var(--tm); margin-top:6px; }
+.ev-play { width:100%; margin-top:8px; padding:11px; border-radius:10px; border:1.5px solid var(--bd); background:var(--sf);
+  font-family:var(--fb); font-weight:700; color:var(--ts); }
+.ev-video { width:100%; border-radius:10px; margin-top:8px; background:#000; }
+.dvim { font-size:12.5px; color:var(--tm); margin-top:6px; font-style:italic; }
+.sendback { margin-top:10px; }
+.chips-row { display:flex; flex-wrap:wrap; gap:6px; }
+.chip-btn { border:1.5px solid var(--bd); background:var(--sf); border-radius:16px; padding:6px 11px; font-size:12.5px;
+  font-family:var(--fb); color:var(--ts); }
+.chip-btn.on { border-color:var(--r4); background:var(--r1); color:var(--r5); font-weight:700; }
+.sendback-input { width:100%; margin-top:8px; padding:11px 12px; border:1.5px solid var(--bd); border-radius:10px;
+  font-family:var(--fb); font-size:15px; background:var(--sf); }
+.zoom { position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:80; display:flex; align-items:center; justify-content:center; }
+.zoom img { max-width:100%; max-height:100%; }

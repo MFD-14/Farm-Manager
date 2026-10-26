@@ -2,8 +2,9 @@
 // pre-focused, camera pre-set, Done disabled until the evidence policy is
 // satisfiable, Skip and Problem always one tap away and always cheaper than
 // silence (spec 4.3).
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { reportDone, requestSkip, flagProblem, evidenceReady, compressAndStamp, SKIP_REASONS } from "../lib/capture.js";
+import React, { useEffect, useMemo, useState } from "react";
+import { reportDone, requestSkip, flagProblem, evidenceReady, attachToTask, SKIP_REASONS } from "../lib/capture.js";
+import Attachments from "./Attachments.jsx";
 import { metaGet } from "../lib/db.js";
 
 export default function CaptureSheet({ instance, onClose }) {
@@ -18,8 +19,6 @@ export default function CaptureSheet({ instance, onClose }) {
   const [busy, setBusy] = useState(false);
   const [lastValues, setLastValues] = useState(null);
   const [rainAhead, setRainAhead] = useState(null);
-  const fileRef = useRef(null);
-  const videoRef = useRef(null);
 
   const isSpray = policy.vim_profile === "spray_scene" || policy.inventory_out;
 
@@ -44,24 +43,6 @@ export default function CaptureSheet({ instance, onClose }) {
   const ready = evidenceReady(policy, { fields, photos, videos, voices });
   const isOpen = ["released", "acknowledged", "in_progress"].includes(instance.state);
 
-  async function addPhoto(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const blob = await compressAndStamp(file, { taskCode: instance.template_code });
-    setMediaItems((p) => [...p, {
-      media_uuid: crypto.randomUUID(), kind: "photo", blob,
-      preview: URL.createObjectURL(blob),
-    }]);
-    e.target.value = "";
-  }
-
-  async function addVideo(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setMediaItems((p) => [...p, { media_uuid: crypto.randomUUID(), kind: "video", blob: file }]);
-    e.target.value = "";
-  }
-
   async function submitDone() {
     setBusy(true);
     await reportDone(instance, { fields, mediaItems });
@@ -74,12 +55,21 @@ export default function CaptureSheet({ instance, onClose }) {
   }
   async function submitProblem() {
     setBusy(true);
-    await flagProblem(instance, "other", note);
+    const voice = mediaItems.find((m) => m.kind === "audio");
+    await flagProblem(instance, "other", note, voice);
+    const rest = mediaItems.filter((m) => m !== voice);
+    if (rest.length) await attachToTask(instance, rest);
+    onClose();
+  }
+  async function submitExtra() {
+    setBusy(true);
+    await attachToTask(instance, mediaItems);
     onClose();
   }
 
   const needsPhoto = policy.classes?.includes("E2") || policy.classes?.includes("E3") || policy.any_of?.includes("E2");
   const needsVideo = policy.classes?.includes("E4");
+  const needsVoice = policy.classes?.includes("E5");
   const photoMin = policy.photo_min ?? (policy.classes?.includes("E3") ? 2 : needsPhoto ? 1 : 0);
 
   return (
@@ -98,7 +88,7 @@ export default function CaptureSheet({ instance, onClose }) {
           </div>
         )}
 
-        {instance.retake_reason && <div className="retake">Retake asked: {instance.retake_reason}</div>}
+        {instance.retake_reason && <div className="retake">Sent back: {instance.retake_reason}</div>}
 
         {rainAhead && isOpen && (
           <div className="retake">
@@ -116,8 +106,19 @@ export default function CaptureSheet({ instance, onClose }) {
         {!isOpen && (
           <p className="evidence-note">
             This task is {instance.state.replaceAll("_", " ")}.
-            {instance.state === "done_reported" && " It will sync and verify automatically."}
+            {["done_reported", "needs_review"].includes(instance.state) && " An owner or task manager will check the evidence and accept it."}
           </p>
+        )}
+        {["done_reported", "needs_review", "blocked", "skip_pending"].includes(instance.state) && (
+          <>
+            <div className="section-title">Add more evidence</div>
+            <Attachments items={mediaItems} setItems={setMediaItems} taskCode={instance.template_code} />
+            {mediaItems.length > 0 && (
+              <button className="btn primary block" disabled={busy} onClick={submitExtra}>
+                {busy ? "Saving…" : `Add ${mediaItems.length} to this task`}
+              </button>
+            )}
+          </>
         )}
 
         {isOpen && mode === "capture" && (
@@ -146,33 +147,17 @@ export default function CaptureSheet({ instance, onClose }) {
               </div>
             ))}
 
-            {needsPhoto && (
-              <div className="field">
-                <label>Photo {photoMin > 1 ? `(${photos}/${photoMin}${policy.pair ? ", before and after" : ""})` : ""}</label>
-                <input ref={fileRef} type="file" accept="image/*" capture="environment"
-                  style={{ display: "none" }} onChange={addPhoto} />
-                <button className="btn ghost block" onClick={() => fileRef.current?.click()}>
-                  {photos ? "Add another photo" : "Take photo"}
-                </button>
-                <div className="photo-strip">
-                  {mediaItems.filter((m) => m.kind === "photo").map((m) => (
-                    <img key={m.media_uuid} src={m.preview} alt="" />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {needsVideo && (
-              <div className="field">
-                <label>Video (10–20 s)</label>
-                <input ref={videoRef} type="file" accept="video/*" capture="environment"
-                  style={{ display: "none" }} onChange={addVideo} />
-                <button className="btn ghost block" onClick={() => videoRef.current?.click()}>
-                  {videos ? "Replace video" : "Record video"}
-                </button>
-                {videos > 0 && <p className="evidence-note">Video attached, uploads on WiFi or off-peak.</p>}
-              </div>
-            )}
+            <div className="field">
+              <label>
+                Evidence
+                {photoMin > 0 && ` · photo ${photos}/${photoMin}${policy.pair ? " (before and after)" : ""}`}
+                {needsVideo && ` · video ${videos}/1`}
+                {needsVoice && ` · voice note ${voices}/1`}
+                {!photoMin && !needsVideo && !needsVoice && " (optional)"}
+              </label>
+              <Attachments items={mediaItems} setItems={setMediaItems} taskCode={instance.template_code}
+                need={{ photo: photos < photoMin, video: needsVideo && !videos, voice: needsVoice && !voices }} />
+            </div>
 
             <button className="btn primary block" disabled={!ready || busy} onClick={submitDone}>
               {busy ? "Saving…" : "Done"}
@@ -208,8 +193,9 @@ export default function CaptureSheet({ instance, onClose }) {
             <div className="field">
               <label>What is wrong?</label>
               <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)}
-                placeholder="Describe the problem…" />
+                placeholder="Describe the problem, or record a voice note…" />
             </div>
+            <Attachments items={mediaItems} setItems={setMediaItems} taskCode={instance.template_code} />
             <button className="btn danger block" disabled={busy} onClick={submitProblem}>Flag problem</button>
             <button className="btn ghost block" onClick={() => setMode("capture")}>Back</button>
           </>

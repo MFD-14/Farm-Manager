@@ -1,6 +1,5 @@
-// WhatsApp reminders and Claude photo checking (owner only). Keys are saved on
-// the server and never shown again; the sheet only shows that one is saved and
-// its last four characters.
+// WhatsApp reminders (owner only). Keys are saved on the server and never shown
+// again; the sheet only shows that one is saved and its last four characters.
 import React, { useEffect, useState } from "react";
 import { apiJson, errorMessage } from "../lib/api.js";
 
@@ -8,8 +7,6 @@ const STATUS_CLASS = { sent: "ok", delivered: "ok", read: "ok", processed: "ok",
   logged_only: "muted", skipped_window_closed: "warn", skipped_no_phone: "warn", ignored_not_allowlisted: "warn" };
 const STATUS_LABEL = { logged_only: "not sent (WhatsApp not set up)", skipped_window_closed: "skipped (no template)",
   ignored_not_allowlisted: "ignored (unknown number)", processed: "received" };
-// Rough cost per photo: ~1,800 input tokens (photo + task) and ~800 output.
-const PER_PHOTO = { "claude-opus-5-5": "about 2¢", "claude-sonnet-5-5": "about 1¢", "claude-haiku-5-5": "under 0.1¢" };
 
 function when(ts) {
   const d = new Date(ts);
@@ -59,7 +56,7 @@ function WhatsAppCard({ data, people, activity, onSaved }) {
     setBusy(true); setMsg(null);
     try {
       const body = { phoneId: f.phoneId, language: f.language, apiVersion: f.apiVersion, reminders: f.reminders,
-        morningPlan: f.morningPlan, morningTime: f.morningTime, ownerAlerts: f.ownerAlerts, retakes: f.retakes };
+        morningPlan: f.morningPlan, morningTime: f.morningTime, ownerAlerts: f.ownerAlerts, sentBack: f.sentBack };
       if (f.token) body.token = f.token;
       if (f.appSecret) body.appSecret = f.appSecret;
       const r = await apiJson("/api/integrations", { method: "POST", body: { whatsapp: body } });
@@ -85,7 +82,7 @@ function WhatsAppCard({ data, people, activity, onSaved }) {
   return (
     <div className="card conn-card">
       <div className="conn-head">
-        <div><b>WhatsApp reminders</b><small>Task reminders with Done / Problem / Skip buttons, the morning task list, photo retakes and alerts to you</small></div>
+        <div><b>WhatsApp reminders</b><small>Task reminders with Done / Problem / Skip buttons, the morning task list, sent-back notices and alerts to you</small></div>
         <span className={`chip ${wa.configured ? "conn-on" : "conn-off"}`}>{wa.configured ? "Connected" : "Not set up"}</span>
       </div>
 
@@ -114,8 +111,8 @@ function WhatsAppCard({ data, people, activity, onSaved }) {
           <input type="time" value={f.morningTime || "06:00"} onChange={(e) => set("morningTime")(e.target.value)} />
         </div>
       )}
-      <Toggle label="Photo retake requests" hint="When Claude can't use a photo" checked={f.retakes} onChange={set("retakes")} />
-      <Toggle label="Alerts to owners" hint="Missed tasks and the 19:00 digest" checked={f.ownerAlerts} onChange={set("ownerAlerts")} />
+      <Toggle label="Sent-back notices" hint="Tells the caretaker why a task was sent back" checked={f.sentBack} onChange={set("sentBack")} />
+      <Toggle label="Alerts to owners and task managers" hint="Missed tasks and the 19:00 digest" checked={f.ownerAlerts} onChange={set("ownerAlerts")} />
 
       <button type="button" className="link-btn left" onClick={() => setShowTemplates(!showTemplates)}>
         {showTemplates ? "Hide" : "Show"} the {templates.length} message templates to create in WhatsApp Manager
@@ -180,92 +177,6 @@ function WhatsAppCard({ data, people, activity, onSaved }) {
   );
 }
 
-function ClaudeCard({ data, activity, onSaved }) {
-  const cl = data.claude;
-  const [f, setF] = useState({ ...cl, apiKey: "" });
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState(null);
-  const set = (k) => (v) => setF({ ...f, [k]: v });
-
-  async function save() {
-    setBusy(true); setMsg(null);
-    try {
-      const body = { enabled: f.enabled, model: f.model, effort: f.effort, monthlyCapUsd: Number(f.monthlyCapUsd) };
-      if (f.apiKey) body.apiKey = f.apiKey;
-      const r = await apiJson("/api/integrations", { method: "POST", body: { claude: body } });
-      setF({ ...r.claude, apiKey: "" });
-      onSaved(r);
-      setMsg({ ok: true, text: r.claude.active ? "Saved. New photos will be checked by Claude." : "Saved." });
-    } catch (e) { setMsg({ ok: false, text: errorMessage(e) }); } finally { setBusy(false); }
-  }
-  async function test() {
-    setBusy(true); setMsg(null);
-    try {
-      const r = await apiJson("/api/integrations/claude/test", { method: "POST" });
-      setMsg(r.ok ? { ok: true, text: `Connected to ${r.model} (${(r.ms / 1000).toFixed(1)}s).` } : { ok: false, text: r.error });
-    } catch (e) { setMsg({ ok: false, text: errorMessage(e) }); } finally { setBusy(false); }
-  }
-
-  const month = activity?.month;
-  return (
-    <div className="card conn-card">
-      <div className="conn-head">
-        <div><b>Claude photo checking</b><small>Claude looks at each evidence photo, compares it with the task and what was reported, and passes it, asks for a retake, or sends it to you</small></div>
-        <span className={`chip ${cl.active ? "conn-on" : "conn-off"}`}>{cl.active ? "On" : "Off"}</span>
-      </div>
-
-      <Toggle label="Check photos with Claude" hint="Off: photos pass on a basic size check, as before"
-        checked={f.enabled} onChange={set("enabled")} />
-      <Secret label="Anthropic API key" set={cl.apiKeySet} hintText={cl.apiKeyHint} value={f.apiKey} onChange={set("apiKey")}
-        placeholder="sk-ant-… from console.anthropic.com → API keys" />
-      <div className="field">
-        <label>Model</label>
-        <select value={f.model} onChange={(e) => set("model")(e.target.value)}>
-          {Object.entries(data.models).map(([id, m]) => (
-            <option key={id} value={id}>{m.label} ({PER_PHOTO[id] || "?"}/photo)</option>
-          ))}
-        </select>
-      </div>
-      <div className="field">
-        <label>How carefully</label>
-        <select value={f.effort} onChange={(e) => set("effort")(e.target.value)}>
-          <option value="low">Quick (cheapest)</option>
-          <option value="medium">Normal</option>
-          <option value="high">Thorough (costs more)</option>
-        </select>
-      </div>
-      <div className="field inline-field">
-        <label>Monthly spending cap (USD)</label>
-        <input type="number" min="0" step="1" value={f.monthlyCapUsd} onChange={(e) => set("monthlyCapUsd")(e.target.value)} />
-      </div>
-      <small className="field-hint">When the cap is reached, photos fall back to the basic check until next month. 0 means no cap.
-        Photos are sent to Anthropic to be checked.</small>
-
-      {msg && <p className={`form-msg ${msg.ok ? "good" : "bad"}`}>{msg.text}</p>}
-      <button type="button" className="btn primary block" disabled={busy} onClick={save}>{busy ? "Saving…" : "Save photo checking settings"}</button>
-      {cl.apiKeySet && <button type="button" className="btn ghost block" disabled={busy} onClick={test}>Test the API key</button>}
-
-      {month && (
-        <div className="section-title">This month · {month.photos} photo{month.photos === 1 ? "" : "s"} checked · ${Number(month.usd).toFixed(2)}
-          {Number(f.monthlyCapUsd) > 0 ? ` of $${Number(f.monthlyCapUsd).toFixed(0)}` : ""}</div>
-      )}
-      {(activity?.checks || []).slice(0, 10).map((j, i) => (
-        <div className="act-row" key={i}>
-          <span className="act-when">{when(j.created_at)}</span>
-          <span className="act-what">
-            {j.template_code} {j.title}
-            {j.reason ? <small>{j.reason}</small> : null}
-            {j.last_error && j.status !== "done" ? <small className="act-err">{j.last_error}</small> : null}
-          </span>
-          <span className={`act-status ${j.verdict === "pass" ? "ok" : j.verdict ? "warn" : j.status === "failed" ? "bad" : "muted"}`}>
-            {j.verdict ? `${j.verdict} ${Math.round((j.confidence || 0) * 100)}%` : j.status}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function ConnectionsSheet({ onClose }) {
   const [data, setData] = useState(null);
   const [people, setPeople] = useState([]);
@@ -287,14 +198,13 @@ export default function ConnectionsSheet({ onClose }) {
   return (
     <div className="sheet" onClick={onClose}>
       <div className="panel" onClick={(e) => e.stopPropagation()}>
-        <h2>WhatsApp & photo checking</h2>
-        <div className="code">Connections to WhatsApp and Claude</div>
+        <h2>WhatsApp</h2>
+        <div className="code">The farm's WhatsApp Business number</div>
         {err && <p className="form-msg bad">{err}</p>}
         {!data && !err && <div className="empty">Loading…</div>}
         {data && (
           <>
             <WhatsAppCard data={data} people={people} activity={activity?.whatsapp} onSaved={(d) => { setData(d); load(); }} />
-            <ClaudeCard data={data} activity={activity?.claude} onSaved={(d) => { setData(d); load(); }} />
           </>
         )}
         <button type="button" className="btn ghost block" onClick={onClose}>Close</button>
