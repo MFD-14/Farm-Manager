@@ -168,3 +168,25 @@ test("a caretaker's phone can't accept its own work or forge events through sync
   const ev = (await q(`SELECT actor_type FROM task_events WHERE instance_id = $1 AND type = 'seen'`, [k01.id])).rows[0];
   assert.equal(ev.actor_type, "caretaker");
 });
+
+test("a VIM concern keeps a task out of accept-all; a day in the queue alerts once", async () => {
+  const w01 = await readyW01();
+  const media = (await q(`SELECT media_uuid FROM media_objects WHERE instance_id = $1`, [w01.id])).rows[0];
+  await q(`INSERT INTO vim_verdicts (media_uuid, instance_id, verdict, confidence, extracted, model_version)
+           VALUES ($1, $2, 'fail', 0.8, '{"reason":"no gauge in view"}', 'vim-1.1')`, [media.media_uuid, w01.id]);
+  const card = (await api("/api/instances?state=decisions", { token: owner })).json.instances.find((i) => i.id === w01.id);
+  assert.equal(card.ready_to_accept, false);
+  const bulk = await api("/api/instances/accept", { method: "POST", token: owner, body: { ids: [w01.id] } });
+  assert.deepEqual(bulk.json.skipped, [w01.id]);
+  // Still acceptable one by one, after a look.
+  assert.equal((await api(`/api/instances/${w01.id}/decision`, { method: "POST", token: owner, body: { action: "accept" } })).json.state,
+    "verified_closed");
+
+  const w = await readyW01(1);
+  await q(`UPDATE task_instances SET updated_at = now() - interval '25 hours' WHERE id = $1`, [w.id]);
+  const { runEscalationSweep } = await import("../src/engine/escalation.js");
+  await tx((c) => runEscalationSweep(c));
+  await tx((c) => runEscalationSweep(c));
+  const alerts = (await q(`SELECT count(*)::int AS n FROM notifications_log WHERE rung = 'review_aging'`)).rows[0].n;
+  assert.equal(alerts, 1);
+});

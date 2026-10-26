@@ -98,6 +98,14 @@ export function acceptanceOnly(flags) {
   return Array.isArray(flags) && flags.length > 0 && flags.every((f) => f.kind === "awaiting_acceptance");
 }
 
+// VIM v1.1 is advisory, but it still steers attention: a fail or unusable
+// annotation keeps the task out of "accept all", so a person looks at it.
+export const VIM_CONCERNS = new Set(["fail", "unusable"]);
+export function readyToAccept(state, flags, vimVerdicts = []) {
+  return state === "needs_review" && acceptanceOnly(flags)
+    && !vimVerdicts.some((v) => VIM_CONCERNS.has(v.verdict));
+}
+
 // Video Intelligence Module annotations (VIM v1.1 analyses field video). They
 // are advisory: stored and shown on the acceptance card next to the evidence,
 // never moving a task by themselves.

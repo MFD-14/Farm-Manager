@@ -5,7 +5,7 @@ import { q, tx } from "../db/pool.js";
 import { auth, requireRole } from "../middleware/auth.js";
 import { foldEvent } from "../engine/fold.js";
 import { farmDateStr, farmTime, addDays } from "../util/time.js";
-import { acceptanceOnly } from "../engine/verification.js";
+import { readyToAccept } from "../engine/verification.js";
 import { sendSentBack } from "../workers/whatsappSender.js";
 
 // Owners and task managers run the acceptance queue and see every task.
@@ -101,7 +101,8 @@ instancesRouter.post("/accept", auth(), requireRole(...CONSOLE_ROLES), async (re
       const flags = (await c.query(
         `SELECT payload->'flags' AS flags FROM task_events WHERE instance_id = $1 AND type = 'review_required'
          ORDER BY server_time DESC LIMIT 1`, [id])).rows[0]?.flags;
-      if (inst?.state !== "needs_review" || !acceptanceOnly(flags)) { skipped.push(id); return; }
+      const vim = (await c.query(`SELECT verdict FROM vim_verdicts WHERE instance_id = $1`, [id])).rows;
+      if (!readyToAccept(inst?.state, flags, vim)) { skipped.push(id); return; }
       const r = await decide(c, { instanceId: id, action: "accept", note: req.body?.note || null, user: req.user });
       (r.status === "accepted" ? accepted : skipped).push(id);
     });
@@ -131,7 +132,7 @@ instancesRouter.get("/", auth(), async (req, res) => {
        FROM task_instances ti WHERE ti.state IN ('needs_review','skip_pending','blocked')
        ORDER BY CASE ti.priority WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 ELSE 2 END, ti.updated_at`);
     return res.json({
-      instances: r.rows.map((i) => ({ ...i, ready_to_accept: i.state === "needs_review" && acceptanceOnly(i.review_flags) })),
+      instances: r.rows.map((i) => ({ ...i, ready_to_accept: readyToAccept(i.state, i.review_flags, i.vim) })),
     });
   }
   const r = await q(

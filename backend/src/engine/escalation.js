@@ -178,7 +178,11 @@ export async function runEscalationSweep(c, { now = new Date() } = {}) {
       });
       fired.push({ id: s.id, rung: "absence_auto_skip" });
     }
-    const { rows: reviews } = await c.query(
+    // Evidence is accepted by a person. With an active task manager the queue
+    // keeps being worked during the owner's absence, so nothing auto-closes;
+    // only a farm with no one to accept falls back to the flagged auto-close.
+    const managers = (await c.query(`SELECT count(*)::int AS n FROM users WHERE role = 'manager' AND active`)).rows[0].n;
+    const { rows: reviews } = managers ? { rows: [] } : await c.query(
       `SELECT id FROM task_instances WHERE state = 'needs_review' AND updated_at < $1`,
       [new Date(now - 72 * 3_600_000)]);
     for (const r of reviews) {
@@ -188,6 +192,25 @@ export async function runEscalationSweep(c, { now = new Date() } = {}) {
         payload: { verification: { method: "deferred_owner_audit", verdict: "pass", flagged: true } },
       });
       fired.push({ id: r.id, rung: "absence_auto_close" });
+    }
+  }
+
+  // Acceptance queue ageing: a task waiting more than 24 hours for an owner
+  // or task manager raises one alert (WhatsApp to owners and task managers).
+  const { rows: aging } = await c.query(
+    `SELECT id, template_code, title, escalation_state FROM task_instances
+     WHERE state = 'needs_review' AND updated_at < $1 AND NOT (escalation_state ? 'review_aging')`,
+    [new Date(now - 24 * 3_600_000)]);
+  if (aging.length) {
+    await notify(c, {
+      channel: "whatsapp", to: "owner", rung: "review_aging",
+      body: { text: `${aging.length} task${aging.length === 1 ? " has" : "s have"} waited over a day for acceptance: ` +
+        aging.slice(0, 5).map((i) => `${i.template_code} ${i.title}`).join("; ") },
+    });
+    for (const i of aging) {
+      await c.query(`UPDATE task_instances SET escalation_state = escalation_state || $2 WHERE id = $1`,
+        [i.id, JSON.stringify({ review_aging: now.toISOString() })]);
+      fired.push({ id: i.id, rung: "review_aging" });
     }
   }
 
