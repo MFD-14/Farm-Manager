@@ -46,6 +46,9 @@ export default function FieldsSection({ isConsole, center }) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
+    // Phones don't know the .kml type, so the picker allows any file and the
+    // contents are checked here instead.
+    if (/\.kmz$/i.test(file.name)) { setMsg("That's a KMZ file. In Google Earth Pro use Save Place As… and choose KML."); return; }
     try {
       const shapes = parseKml(await file.text());
       if (!shapes.length) { setMsg("No outlines found. In Google Earth Pro draw with Add Polygon, then Save Place As… KML."); return; }
@@ -99,7 +102,7 @@ export default function FieldsSection({ isConsole, center }) {
       )}
       <div className="person-actions">
         <button type="button" className="btn ghost" onClick={() => setWalk("")}>Walk a boundary</button>
-        {isConsole && <label className="btn ghost">Import from Google Earth<input type="file" accept=".kml,application/vnd.google-earth.kml+xml,text/xml" hidden onChange={onKml} /></label>}
+        {isConsole && <label className="btn ghost">Import from Google Earth<input type="file" hidden onChange={onKml} /></label>}
       </div>
 
       {walk !== null && <WalkBoundary fields={fields} initialId={walk} isConsole={isConsole} center={center}

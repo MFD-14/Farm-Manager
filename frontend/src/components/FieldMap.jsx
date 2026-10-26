@@ -17,7 +17,9 @@ export default function FieldMap({ locations = [], center = FARM_CENTER, track, 
 
   useEffect(() => {
     map.current = L.map(el.current, { zoomControl: true, attributionControl: true }).setView([center.lat, center.lng], 15);
-    L.tileLayer(IMAGERY, { maxZoom: 20, maxNativeZoom: 19,
+    // Rural Zimbabwe has dependable Esri imagery to zoom 17; closer tiles are
+    // often "Map data not yet available", so zoom 17 is enlarged beyond that.
+    L.tileLayer(IMAGERY, { maxZoom: 20, maxNativeZoom: 17,
       attribution: "Imagery © Esri, Maxar, Earthstar Geographics" }).addTo(map.current);
     layer.current = L.layerGroup().addTo(map.current);
     return () => map.current.remove();
