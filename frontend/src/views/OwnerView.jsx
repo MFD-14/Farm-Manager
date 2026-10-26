@@ -73,9 +73,34 @@ function Digest() {
   if (err) return <div className="empty">Cannot load digest: {err}</div>;
   if (!digest) return <div className="empty">Loading…</div>;
   const c = digest.completion;
+  const w = digest.week;
   return (
     <div className="wrap">
-      <div className="daytitle">Daily digest · {digest.date}</div>
+      <div className="daytitle">Dashboard</div>
+      <p className="farm-sub">Week to date as of {new Date(`${digest.date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
+      {digest.weather && (
+        <div className="card weather">
+          <b>{Math.round(digest.weather.tmax)}° / {Math.round(digest.weather.tmin)}°C</b>
+          <span>{digest.weather.rain_mm > 0 ? `${digest.weather.rain_mm} mm rain (${digest.weather.prob_pct}%)` : "No rain expected"} · Kwekwe</span>
+        </div>
+      )}
+      <div className="week-grid">
+        {[["Revenue", w.revenue_usd, (v) => `$${Math.round(v).toLocaleString()}`], ["Bundles harvested", w.bundles_harvested],
+          ["New plantings", w.plantings], ["Labour hours", w.labour_hours]].map(([label, p, f = (v) => v]) => (
+          <div className="stat" key={label}>
+            <div className="l">{label}</div>
+            <div className="v">{f(p.now)}</div>
+            <div className="l">{p.before ? `${p.now >= p.before ? "+" : ""}${Math.round(((p.now - p.before) / p.before) * 100)}%` : "–"} on last week</div>
+          </div>
+        ))}
+      </div>
+      {w.labour_by_person.length > 0 && (
+        <div className="card">
+          <h3>Labour hours by person</h3>
+          {w.labour_by_person.map((p) => <div className="kv" key={p.name}><span>{p.name}</span><b>{p.hours} h</b></div>)}
+        </div>
+      )}
+      <div className="section-title">Today</div>
       <div className="stat-row">
         <div className="stat"><div className="v">{c.verified}/{c.total}</div><div className="l">verified</div></div>
         <div className="stat"><div className="v">{c.missed}</div><div className="l">missed</div></div>
@@ -128,7 +153,7 @@ function flagLines(flags = []) {
 function when(ts) {
   if (!ts) return "";
   const d = new Date(ts);
-  return d.toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString("en-GB", { timeZone: "Africa/Harare", weekday: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 function DecisionCard({ item, onDecide, onDetail, onZoom }) {
@@ -291,7 +316,7 @@ function Decisions() {
               <div className="kv" key={e.event_uuid}>
                 <span>{e.type.replaceAll("_", " ")}{e.actor_type !== "system" ? ` · ${e.actor_type}` : ""}{e.payload?.note ? `: ${e.payload.note}` : ""}</span>
                 <span style={{ color: "var(--tm)", fontSize: 12 }}>
-                  {new Date(e.server_time).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  {new Date(e.server_time).toLocaleString("en-GB", { timeZone: "Africa/Harare", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
             ))}

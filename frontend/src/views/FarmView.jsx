@@ -1,4 +1,4 @@
-// Farm profile: the real Woodlands Farm at a glance — water system with
+// Farm Map: satellite view (with signal), then the farm at a glance: water system with
 // buffer autonomy, livestock and flocks, and the block layout. Cached for
 // offline viewing like every other reference screen.
 import React, { useEffect, useState } from "react";
@@ -36,6 +36,10 @@ export default function FarmView() {
       <div className="daytitle">{farm.name}</div>
       <p className="farm-sub">{farm.subdivision} · {farm.location}</p>
       {stale && <p className="evidence-note" style={{ marginBottom: 8 }}>Offline — showing last synced data</p>}
+      {navigator.onLine && farm.coordinates && (
+        <iframe className="farm-map" title="Satellite map of the farm" loading="lazy"
+          src={`https://maps.google.com/maps?q=${farm.coordinates.lat},${farm.coordinates.lng}&t=k&z=15&output=embed`} />
+      )}
 
       <div className="stat-row">
         <div className="stat"><div className="v">{farm.total_ha}</div><div className="l">hectares</div></div>

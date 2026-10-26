@@ -31,6 +31,7 @@ export function createApp() {
         workerSrc: ["'self'"],
         fontSrc: ["'self'", "data:"],
         styleSrc: ["'self'", "'unsafe-inline'"],
+        frameSrc: ["https://maps.google.com", "https://www.google.com"], // Farm Map satellite view
       },
     },
     // The phone shells load the app from the device (capacitor://localhost,

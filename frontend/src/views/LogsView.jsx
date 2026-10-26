@@ -1,6 +1,7 @@
 // Logs: what has been recorded on the farm, newest first, with the readings
 // each record carries. Time & Attendance is the same list narrowed to the
-// weekly attendance and wage sheet (F-02), under the clock in and out card.
+// weekly attendance and wage sheet (F-02), under the clock in and out card;
+// Sales is the same list narrowed to C-02, under its totals and customers.
 // Cached for offline reading.
 import React, { useEffect, useState } from "react";
 import { apiJson } from "../lib/api.js";
@@ -9,7 +10,8 @@ import { metaGet, metaSet } from "../lib/db.js";
 const RECORDED = new Set(["done_reported", "needs_review", "verified_closed", "skipped", "missed"]);
 const STATE_LABEL = { done_reported: "reported", needs_review: "awaiting acceptance", verified_closed: "accepted",
   skipped: "skipped", missed: "missed" };
-const label = (k) => k.replace(/_/g, " ");
+const NAMES = { price_usd: "received $" };
+const label = (k) => NAMES[k] || k.replace(/_/g, " ");
 
 export default function LogsView({ codes, title = "Logs", empty = "Nothing recorded yet.", children }) {
   const [rows, setRows] = useState(null);
@@ -30,7 +32,7 @@ export default function LogsView({ codes, title = "Logs", empty = "Nothing recor
   return (
     <div className="wrap">
       <div className="daytitle">{title}</div>
-      {children}
+      {typeof children === "function" ? children(list) : children}
       {!rows && <div className="empty">Loading…</div>}
       {rows && !list.length && <div className="empty">{empty}</div>}
       {list.map((i) => {
@@ -43,7 +45,7 @@ export default function LogsView({ codes, title = "Logs", empty = "Nothing recor
             </div>
             {fields.length > 0 && <div className="meta">{fields.map(([k, v]) => <span key={k}>{label(k)}: <b>{String(v)}</b></span>)}</div>}
             <div className="meta"><span>{new Date(i.closed_at || i.updated_at || i.due_at).toLocaleString("en-GB",
-              { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span></div>
+              { timeZone: "Africa/Harare", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span></div>
           </div>
         );
       })}

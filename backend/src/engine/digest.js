@@ -61,8 +61,12 @@ export async function buildDigest(c, dateStr = farmDateStr()) {
   const { addDays } = await import("../util/time.js");
   const fcTomorrow = await forecastFor(c, addDays(dateStr, 1));
 
+  const fcToday = await forecastFor(c, dateStr);
+
   const digest = {
     date: dateStr,
+    weather: fcToday ? { tmax: fcToday.tmax, tmin: fcToday.tmin, rain_mm: fcToday.rain_mm, prob_pct: fcToday.prob_pct } : null,
+    week: await weekToDate(c),
     completion: { total, verified, skipped, missed, pending_review: pendingReview },
     water: {
       tank_pct: tank ? Number(tank.value) : null,
@@ -96,6 +100,46 @@ export async function buildDigest(c, dateStr = farmDateStr()) {
     };
   }
   return digest;
+}
+
+// Week to date against the week before (the Tend dashboard's overview):
+// revenue, bundles, plantings, and labour hours from clock-ins and outs.
+async function weekToDate(c) {
+  const sum = async (metric, from, to) => Number((await c.query(
+    `SELECT COALESCE(SUM(value), 0) AS v FROM readings WHERE metric = $1
+     AND taken_at >= now() - ($2 || ' days')::interval AND taken_at < now() - ($3 || ' days')::interval`,
+    [metric, from, to])).rows[0].v);
+  const plantings = async (from, to) => Number((await c.query(
+    `SELECT count(*) AS n FROM task_instances WHERE template_code IN ('C-06', 'C-09', 'C-10')
+     AND state IN ('done_reported', 'needs_review', 'verified_closed')
+     AND updated_at >= now() - ($1 || ' days')::interval AND updated_at < now() - ($2 || ' days')::interval`,
+    [from, to])).rows[0].n);
+  // Pair each clock-in with the next clock-out by the same person.
+  const { rows: clocks } = await c.query(
+    `SELECT u.name, e.payload->>'clock' AS clock, COALESCE(e.device_time, e.server_time) AS t
+     FROM task_events e JOIN users u ON u.id = e.actor_id
+     WHERE e.instance_id IS NULL AND e.type = 'field_recorded' AND e.payload ? 'clock'
+       AND COALESCE(e.device_time, e.server_time) >= now() - interval '14 days'
+     ORDER BY u.name, t`);
+  const hours = { this: {}, prev: {} };
+  const open = {};
+  for (const r of clocks) {
+    if (r.clock === "in") { open[r.name] = new Date(r.t); continue; }
+    if (!open[r.name]) continue;
+    const h = (new Date(r.t) - open[r.name]) / 3_600_000;
+    const bucket = Date.now() - open[r.name] < 7 * 86_400_000 ? "this" : "prev";
+    if (h > 0 && h < 24) hours[bucket][r.name] = (hours[bucket][r.name] || 0) + h;
+    delete open[r.name];
+  }
+  const total = (o) => Math.round(Object.values(o).reduce((a, b) => a + b, 0) * 10) / 10;
+  const pair = (now, before) => ({ now, before });
+  return {
+    revenue_usd: pair(await sum("sales_usd", 7, 0), await sum("sales_usd", 14, 7)),
+    bundles_harvested: pair(await sum("bundle_count", 7, 0), await sum("bundle_count", 14, 7)),
+    plantings: pair(await plantings(7, 0), await plantings(14, 7)),
+    labour_hours: pair(total(hours.this), total(hours.prev)),
+    labour_by_person: Object.entries(hours.this).map(([name, h]) => ({ name, hours: Math.round(h * 10) / 10 })),
+  };
 }
 
 export async function sendDigest(c, dateStr = farmDateStr()) {

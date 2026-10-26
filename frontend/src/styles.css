@@ -485,3 +485,13 @@ button { font-family:var(--fb); cursor:pointer; }
 .note-input { width:100%; border:1px solid var(--bd); border-radius:10px; padding:10px 12px; font:inherit;
   font-size:15px; margin-bottom:8px; background:var(--bg); }
 .help-list { padding-left:18px; } .help-list li { margin-bottom:6px; }
+.card.weather { background:var(--b1); display:flex; flex-direction:column; gap:2px; }
+.card.weather b { font-size:22px; font-family:var(--fd); }
+.week-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+.farm-map { width:100%; height:260px; border:0; border-radius:14px; margin-bottom:12px; box-shadow:var(--ss); }
+.fab { position:fixed; right:18px; bottom:calc(20px + env(safe-area-inset-bottom)); width:56px; height:56px; border-radius:50%;
+  border:none; background:var(--g7); color:#fff; font-size:30px; box-shadow:var(--sm); z-index:30; }
+.fab-menu { position:fixed; right:18px; bottom:calc(86px + env(safe-area-inset-bottom)); background:var(--sf); border-radius:12px;
+  box-shadow:var(--sm); z-index:30; display:flex; flex-direction:column; min-width:180px; }
+.fab-menu button { background:none; border:none; text-align:left; padding:14px 18px; font-size:16px; border-bottom:1px solid var(--bl); }
+.btn.block + .stat-row { margin-top:12px; }

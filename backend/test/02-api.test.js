@@ -251,3 +251,14 @@ test("clock in and out: farm-level entries listed separately from notes", async 
   assert.ok(r.json.notes.every((n) => n.by === "Caretaker"));
   assert.equal((await api("/api/sync/notes", { token: ownerToken })).json.notes.filter((n) => !n.note).length, 0);
 });
+
+test("dashboard: week to date counts labour hours from clock pairs and this week's sales", async () => {
+  const at = (h) => new Date(Date.now() - h * 3_600_000).toISOString();
+  const ev = (clock, h) => ({ event_uuid: randomUUID(), instance_id: null, type: "field_recorded", payload: { clock }, device_time: at(h) });
+  await api("/api/sync/events", { method: "POST", token: caretakerToken, body: { events: [ev("in", 9), ev("out", 1)] } });
+  await q(`INSERT INTO readings (metric, value, taken_at) VALUES ('sales_usd', 50, now()), ('sales_usd', 40, now() - interval '9 days')`);
+  const d = (await api("/api/owner/digest", { token: ownerToken })).json;
+  assert.equal(d.week.labour_hours.now, 8);
+  assert.deepEqual(d.week.labour_by_person, [{ name: "Caretaker", hours: 8 }]);
+  assert.deepEqual(d.week.revenue_usd, { now: 50, before: 40 });
+});

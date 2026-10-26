@@ -4,6 +4,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { getPlanInstances, metaGet } from "../lib/db.js";
 import { pullBundle } from "../lib/sync.js";
+import { apiJson, errorMessage } from "../lib/api.js";
 import { markSeen } from "../lib/capture.js";
 import CaptureSheet from "../components/CaptureSheet.jsx";
 
@@ -16,11 +17,16 @@ function timeOf(inst) {
 }
 function fmtTime(d) {
   if (!d) return "";
-  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("en-GB", { timeZone: "Africa/Harare", hour: "2-digit", minute: "2-digit" });
 }
 
 // codes narrows the list (Field Walk: the walking and scouting tasks).
-export default function DayView({ onCountsChanged, codes, title }) {
+// The + button adds a note (everyone) or releases a task that has no
+// schedule of its own (owners and task managers: projects, purchases, repairs).
+export default function DayView({ onCountsChanged, codes, title, onAddNote, canAddTask }) {
+  const [adding, setAdding] = useState(false);
+  const [templates, setTemplates] = useState(null);
+  const [addMsg, setAddMsg] = useState(null);
   const [instances, setInstances] = useState([]);
   const [active, setActive] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -45,6 +51,20 @@ export default function DayView({ onCountsChanged, codes, title }) {
     return () => clearInterval(iv);
   }, [refresh]);
 
+  async function pickTemplate() {
+    setAdding(false); setAddMsg(null);
+    try {
+      setTemplates((await apiJson("/api/templates")).templates.filter((t) => !t.schedule));
+    } catch (e) { alert(errorMessage(e, "Adding a task needs signal.")); }
+  }
+  async function addTask(code) {
+    try {
+      await apiJson("/api/owner/release-task", { method: "POST", body: { template_code: code } });
+      setTemplates(null);
+      await pullBundle(); refresh();
+    } catch (e) { setAddMsg(errorMessage(e)); }
+  }
+
   async function openTask(inst) {
     const seen = await markSeen(inst);
     setActive(seen || inst);
@@ -54,7 +74,7 @@ export default function DayView({ onCountsChanged, codes, title }) {
   const waiting = instances.filter((i) => WAITING_STATES.has(i.state));
   const closed = instances.filter((i) => !OPEN_STATES.has(i.state) && !WAITING_STATES.has(i.state));
 
-  const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  const today = new Date().toLocaleDateString("en-GB", { timeZone: "Africa/Harare", weekday: "long", day: "numeric", month: "long" });
 
   return (
     <div className="wrap">
@@ -62,7 +82,7 @@ export default function DayView({ onCountsChanged, codes, title }) {
       {windows.map((w, i) => (
         <div className="withhold-banner" key={i}>
           <b>{w.type === "phi" ? "Pre-harvest interval" : "Withdrawal"} active</b> · {w.subject_name}
-          {" "}until {new Date(w.until).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+          {" "}until {new Date(w.until).toLocaleDateString("en-GB", { timeZone: "Africa/Harare", day: "numeric", month: "short" })}
           {" "}({w.days_remaining}d left) · {w.product}
         </div>
       ))}
@@ -83,6 +103,28 @@ export default function DayView({ onCountsChanged, codes, title }) {
       {closed.length > 0 && <div className="section-title">Finished today</div>}
       {closed.map((inst) => <TaskCard key={inst.id} inst={inst} done />)}
 
+      {onAddNote && (
+        <>
+          {adding && (
+            <div className="fab-menu">
+              {canAddTask && <button type="button" onClick={pickTemplate}>Add task</button>}
+              <button type="button" onClick={onAddNote}>Add note</button>
+            </div>
+          )}
+          <button type="button" className="fab" aria-label="Add" onClick={() => setAdding(!adding)}>+</button>
+        </>
+      )}
+      {templates && (
+        <div className="sheet" onClick={() => setTemplates(null)}>
+          <div className="panel" onClick={(e) => e.stopPropagation()}>
+            <h2>Add a task</h2>
+            {addMsg && <p className="form-msg bad">{addMsg}</p>}
+            {templates.map((t) => (
+              <button type="button" key={t.code} className="btn ghost block" onClick={() => addTask(t.code)}>{t.code} {t.title}</button>
+            ))}
+          </div>
+        </div>
+      )}
       {active && (
         <CaptureSheet
           instance={active}

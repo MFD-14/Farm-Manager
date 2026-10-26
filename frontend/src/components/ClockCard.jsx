@@ -6,7 +6,7 @@ import { apiJson } from "../lib/api.js";
 import { metaGet, metaSet, pendingEvents } from "../lib/db.js";
 import { clockInOut } from "../lib/capture.js";
 
-const at = (t) => new Date(t).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const at = (t) => new Date(t).toLocaleString("en-GB", { timeZone: "Africa/Harare", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default function ClockCard({ user, onCountsChanged }) {
   const [entries, setEntries] = useState([]);

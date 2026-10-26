@@ -60,7 +60,7 @@ export default function RainView({ onCaptureToday }) {
           {data.last_reading && (
             <div className="last">
               last reading {fmt(data.last_reading.mm)} mm ·{" "}
-              {new Date(data.last_reading.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+              {new Date(data.last_reading.at).toLocaleDateString("en-GB", { timeZone: "Africa/Harare", day: "numeric", month: "short" })}
             </div>
           )}
           {onCaptureToday && (

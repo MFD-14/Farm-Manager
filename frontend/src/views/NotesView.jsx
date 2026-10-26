@@ -8,7 +8,7 @@ import { saveNote } from "../lib/capture.js";
 import Attachments from "../components/Attachments.jsx";
 import { EvidencePhoto, EvidencePlayer } from "./OwnerView.jsx";
 
-const when = (t) => new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const when = (t) => new Date(t).toLocaleString("en-GB", { timeZone: "Africa/Harare", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export default function NotesView({ onCountsChanged }) {
   const [text, setText] = useState("");

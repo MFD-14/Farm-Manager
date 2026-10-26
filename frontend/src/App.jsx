@@ -8,6 +8,7 @@ import RainView from "./views/RainView.jsx";
 import WaterView from "./views/WaterView.jsx";
 import FarmView from "./views/FarmView.jsx";
 import NotesView from "./views/NotesView.jsx";
+import SalesView from "./views/SalesView.jsx";
 import LogsView from "./views/LogsView.jsx";
 import CropPlanView from "./views/CropPlanView.jsx";
 import AboutSheet from "./components/AboutSheet.jsx";
@@ -30,6 +31,7 @@ const MENU = [
   { key: "dashboard", sn: "Pfupiso", label: "Dashboard", console: true, icon: "M12 3a9 9 0 109 9h-9z" },
   { key: "tasks", sn: "Mabasa", label: "Tasks", icon: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" },
   { key: "review", sn: "Ongorora", label: "Review", console: true, icon: "M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" },
+  { key: "sales", sn: "Kutengesa", label: "Sales", icon: "M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" },
   { key: "notes", sn: "Zvinyorwa", label: "Notes", icon: "M11 4H4v16h16v-7M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z" },
   { key: "farm", sn: "Mepu yepurazi", label: "Farm Map", icon: "M1 6v16l7-4 8 4 7-4V2l-7 4-8-4zM8 2v16M16 6v16" },
   { key: "crop", sn: "Zvirimwa nechirimwa", label: "Crop Plan By Crop", icon: LEAF_ICON },
@@ -198,9 +200,10 @@ export default function App() {
 
   const views = {
     dashboard: () => <OwnerView tab="day" />,
-    tasks: () => <DayView onCountsChanged={refreshCounts} />,
+    tasks: () => <DayView onCountsChanged={refreshCounts} onAddNote={() => setTab("notes")} canAddTask={isConsole} />,
     review: () => <OwnerView tab="decisions" />,
     notes: () => <NotesView onCountsChanged={refreshCounts} />,
+    sales: () => <SalesView onCountsChanged={refreshCounts} />,
     farm: () => <FarmView />,
     crop: () => <CropPlanView mode="crop" />,
     cropmap: () => <CropPlanView mode="map" />,

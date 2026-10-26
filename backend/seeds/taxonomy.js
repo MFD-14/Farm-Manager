@@ -65,7 +65,7 @@ export const TEMPLATES = [
   },
   {
     code: "C-02", title: "Sales and dispatch record", domain: "C", priority: "P1", est_minutes: 1,
-    evidence_policy: E.E1E2([num("bundles_sold", "Bundles sold", 0, 2000), num("price_usd", "Price (USD)", 0, 10000), text("buyer", "Buyer")]),
+    evidence_policy: E.E1E2([num("bundles_sold", "Bundles sold", 0, 2000), num("price_usd", "Total received (USD)", 0, 10000), text("buyer", "Buyer")]),
     schedule: { type: "calendar", freq: "daily", at: ["16:30"], fixed: true },
     readings: [{ metric: "bundles_sold", from: "bundles_sold" }, { metric: "sales_usd", from: "price_usd" }],
     instructions: [{ text: "Record at sale or collection: bundles, price, buyer, photo of load or cash tally." }],
