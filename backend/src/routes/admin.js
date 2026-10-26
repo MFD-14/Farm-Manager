@@ -241,6 +241,49 @@ ownerRouter.get("/kpis", auth(), async (req, res) => {
   res.json(kpis);
 });
 
+// Scaling plan (July 2026 to June 2027): milestones with progress computed
+// from farm data, project steps (Phase 0 tank, reticulation), kale and
+// poultry plans.
+ownerRouter.get("/plan", auth(), requireRole("owner", "admin", "manager"), async (req, res) => {
+  const { planStatus } = await import("../engine/plans.js");
+  res.json(await tx((c) => planStatus(c)));
+});
+
+// Mark a milestone by hand ("done", "blocked", or "auto" to go back to the
+// computed status), with an optional note.
+ownerRouter.post("/plan/:key", auth(), requireRole("owner", "admin", "manager"), async (req, res) => {
+  const { status, note } = req.body || {};
+  if (!["done", "blocked", "auto"].includes(status)) return res.status(400).json({ error: "status must be done, blocked or auto" });
+  const plan = (await q(`SELECT value FROM farm_settings WHERE key = 'scaling_plan'`)).rows[0]?.value;
+  const m = plan?.milestones?.find((x) => x.key === req.params.key);
+  if (!m) return res.status(404).json({ error: "no such milestone" });
+  m.status = status;
+  m.note = note ? String(note).slice(0, 300) : m.note || null;
+  m.marked_by = req.user.id;
+  m.marked_at = new Date().toISOString();
+  await q(`UPDATE farm_settings SET value = $1, updated_at = now() WHERE key = 'scaling_plan'`, [JSON.stringify(plan)]);
+  const { planStatus } = await import("../engine/plans.js");
+  res.json(await tx((c) => planStatus(c)));
+});
+
+// Release an owner-released task now (project steps, chick placement, planting
+// with the rains). Only templates without a recurring schedule.
+ownerRouter.post("/release-task", auth(), requireRole("owner", "admin", "manager"), async (req, res) => {
+  const { template_code, title, note } = req.body || {};
+  const tpl = (await q(`SELECT code, schedule, active FROM task_templates WHERE code = $1 ORDER BY version DESC LIMIT 1`,
+    [template_code])).rows[0];
+  if (!tpl) return res.status(404).json({ error: "unknown task" });
+  if (tpl.schedule) return res.status(400).json({ error: "That task runs on its own schedule" });
+  if (!tpl.active) return res.status(400).json({ error: "That task is switched off" });
+  const { releaseTemplateNow } = await import("../engine/rules.js");
+  const id = await tx((c) => releaseTemplateNow(c, template_code, {
+    title: title ? String(title).slice(0, 200) : null,
+    params: note ? { owner_note: String(note).slice(0, 500) } : {},
+    dueAt: new Date(Date.now() + 24 * 3_600_000),
+  }));
+  res.status(201).json({ id });
+});
+
 ownerRouter.post("/absence", auth(), requireRole("owner"), async (req, res) => {
   const { active, from, until, deputy_contact } = req.body || {};
   await q(

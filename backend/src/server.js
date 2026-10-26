@@ -9,6 +9,7 @@ import { evaluateRules } from "./engine/rules.js";
 import { sendDigest } from "./engine/digest.js";
 import { acceptanceSweep } from "./workers/vim.js";
 import { runMorningPlan } from "./workers/morningPlan.js";
+import { releasePlannedTasks } from "./engine/plans.js";
 import { fetchForecast } from "./workers/forecast.js";
 import { farmDateStr } from "./util/time.js";
 
@@ -32,6 +33,9 @@ async function main() {
     try {
       const r = await tx((c) => runRelease(c, farmDateStr()));
       console.log(`release: ${r.planIds.length} instances`);
+      // Scaling-plan steps due today (chick orders and placements).
+      const planned = await tx((c) => releasePlannedTasks(c, farmDateStr()));
+      if (planned.length) console.log(`plan: released ${planned.map((p) => p.step).join(", ")}`);
     } catch (e) { console.error("release failed", e); }
   }, TZ);
 

@@ -51,6 +51,13 @@ async function projectReadings(c, event, instance, policy) {
        ON CONFLICT (metric, source_event_uuid) WHERE source_event_uuid IS NOT NULL DO NOTHING`,
       [spec.metric, value, spec.unit || null, instance.subject_type, instance.subject_id,
        event.device_time || event.server_time || new Date(), event.event_uuid, event.device_id || null]);
+    // Phase 0: the measured usable tank volume replaces the 80,000 to 125,000 L
+    // estimate everywhere (T1 low-water rule, water balance, buffer autonomy).
+    if (spec.metric === "tank_usable_measured_l" && value > 0) {
+      await c.query(
+        `UPDATE farm_settings SET value = value || jsonb_build_object('tank_usable', $1::numeric, 'tank_usable_measured', true),
+           updated_at = now() WHERE key = 'water_params'`, [value]);
+    }
   }
   // Meter accumulators (S3): pump run hours etc.
   for (const m of policy?.meters || []) {

@@ -93,8 +93,8 @@ test("release: idempotent, ordered by priority, W-01 twice daily", async () => {
 
   const plan = (await q(`SELECT * FROM daily_plans WHERE plan_date = $1`, [TODAY])).rows[0];
   assert.ok(plan.instance_ids.length >= 10, `plan has ${plan.instance_ids.length} instances`);
-  // No maize is grown (land use Oct 2026): the maize FAW scout is switched off.
-  assert.equal((await instancesByCode("C-04")).length, 0);
+  // Monday: C-04 FAW scout (maize bed) must be in the plan
+  assert.equal((await instancesByCode("C-04")).length, 1);
 });
 
 test("release: irrigation planner emits W-03 shifts from real stand", async () => {
@@ -205,10 +205,7 @@ test("T1 low water: releases W-E1, suppresses W-03, respects cooldown; T1 stage 
 });
 
 test("T3 FAW: scout above whorl threshold releases C-E1 spray", async () => {
-  // The rule stays ready for when maize is planted again and C-04 switched on.
-  await q(`UPDATE task_templates SET active = true WHERE code = 'C-04'`);
   await tx((c) => runRelease(c, TODAY));
-  await q(`UPDATE task_templates SET active = false WHERE code = 'C-04'`);
   const [c04] = await instancesByCode("C-04");
   await appendEvent(c04.id, "done_reported", {
     fields: { plants_inspected: 100, fresh_damage_plants: 25, crop_stage: "whorl" },

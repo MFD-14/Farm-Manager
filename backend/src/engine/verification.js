@@ -33,6 +33,13 @@ export async function routeAfterDoneReported(c, instance, policy, evidenceCheck,
     if (sanity) flags.push(sanity);
   }
 
+  // Fall armyworm resistance management: the same IRAC group twice running.
+  if (instance.template_code === "C-E1") {
+    const { rotationFlag } = await import("./plans.js");
+    const rot = await rotationFlag(c, instance, event?.payload?.fields || instance.evidence_summary?.fields);
+    if (rot) flags.push(rot);
+  }
+
   if (flags.length) {
     await appendSystemEvent(c, instance.id, "review_required", { flags });
     return;

@@ -6,6 +6,7 @@ import {
 } from "../../seeds/taxonomy.js";
 import {
   ESCALATION_PROFILES, RULES, ASSETS, LOCATIONS, HERDS, POULTRY_BATCHES, INVENTORY, WATER_SYSTEM,
+  KALE_PLAN, POULTRY_PLAN, FAW_HISTORY, SCALING_PLAN,
 } from "../../seeds/reference.js";
 
 export async function seed({ withUsers = true } = {}) {
@@ -124,7 +125,7 @@ export async function seed({ withUsers = true } = {}) {
     // Templates (taxonomy + chain support)
     for (const t of [...TEMPLATES, ...CHAIN_SUPPORT_TEMPLATES]) {
       const extra = {};
-      for (const k of ["readings", "meters", "anchor_emit", "inventory_out", "inventory_in", "rotation_register", "withdrawal_from_product", "e0_sampled", "assignee_role"]) {
+      for (const k of ["readings", "meters", "anchor_emit", "inventory_out", "inventory_in", "rotation_register", "withdrawal_from_product", "e0_sampled", "assignee_role", "project"]) {
         if (t[k] !== undefined) extra[k] = t[k];
       }
       await c.query(
@@ -147,15 +148,16 @@ export async function seed({ withUsers = true } = {}) {
         ]);
     }
 
-    // One-time land-use change (Oct 2026): no maize or sorghum is grown, so the
-    // maize scout and maize/sorghum planting tasks are switched off once. The
-    // marker stops later restarts undoing an owner who switches them back on.
-    const landUse = await c.query(`SELECT 1 FROM farm_settings WHERE key = 'land_use_2026_10'`);
-    if (!landUse.rows.length) {
-      await c.query(`UPDATE task_templates SET active = false WHERE code IN ('C-04', 'C-09')`);
+    // Maize and sorghum are grown in the homestead garden (owner's farm brief),
+    // so the maize armyworm scout and the planting task are on. An earlier
+    // land-use update had switched them off; switch them back on once. The
+    // marker stops later restarts overriding an owner's own choice.
+    const brief = await c.query(`SELECT 1 FROM farm_settings WHERE key = 'farm_brief_2026_10'`);
+    if (!brief.rows.length) {
+      await c.query(`UPDATE task_templates SET active = true WHERE code IN ('C-04', 'C-09')`);
       await c.query(
-        `INSERT INTO farm_settings (key, value) VALUES ('land_use_2026_10', $1)`,
-        [JSON.stringify({ applied_at: new Date().toISOString(), deactivated: ["C-04", "C-09"] })]);
+        `INSERT INTO farm_settings (key, value) VALUES ('farm_brief_2026_10', $1)`,
+        [JSON.stringify({ applied_at: new Date().toISOString(), reactivated: ["C-04", "C-09"] })]);
     }
 
     // Rules
@@ -180,6 +182,24 @@ export async function seed({ withUsers = true } = {}) {
               "BLK-B": {"kc": 1.1, "taw_mm": 90, "mad": 0.5, "area_m2": 2250, "rate_mm_h": 5.0, "efficiency": 0.9}
             }}')
        ON CONFLICT (key) DO NOTHING`);
+
+    // Scaling plan, kale and poultry plans, spray history: stored once, then
+    // the owner's edits (milestone status, dates) are kept on re-seed; new
+    // milestones in a later release merge in.
+    for (const [key, value] of [["kale_plan", KALE_PLAN], ["poultry_plan", POULTRY_PLAN], ["faw_history", FAW_HISTORY]]) {
+      await c.query(`INSERT INTO farm_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING`,
+        [key, JSON.stringify(value)]);
+    }
+    const plan = (await c.query(`SELECT value FROM farm_settings WHERE key = 'scaling_plan'`)).rows[0]?.value;
+    const merged = plan
+      ? { ...SCALING_PLAN, ...plan, milestones: [
+          ...plan.milestones,
+          ...SCALING_PLAN.milestones.filter((m) => !plan.milestones.some((x) => x.key === m.key)),
+        ] }
+      : SCALING_PLAN;
+    await c.query(
+      `INSERT INTO farm_settings (key, value) VALUES ('scaling_plan', $1)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, [JSON.stringify(merged)]);
 
     // Water system. New keys merge in on re-seed; anything already stored wins,
     // so a measured TANK_USABLE entered after Phase 0 is never overwritten.

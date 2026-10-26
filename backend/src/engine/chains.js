@@ -47,11 +47,15 @@ export async function instantiateChainsForAnchor(c, anchorEvent, instance, event
   if (anchorEvent === "batch_placed") {
     const fields = event.payload?.fields || {};
     const house = await c.query(`SELECT id FROM locations WHERE code = $1 OR name = $1 LIMIT 1`, [fields.house || "HOUSE-1"]);
+    // Placements released by the poultry plan carry its label and purpose.
+    const planned = instance.params || {};
+    const houseCode = fields.house || planned.house || "HOUSE-1";
+    const houseRow = fields.house ? house : await c.query(`SELECT id FROM locations WHERE code = $1 LIMIT 1`, [houseCode]);
     const b = await c.query(
-      `INSERT INTO batches (species, name, house_location_id, placed_on, placed_count, current_count, stage)
-       VALUES ('poultry', $1, $2, $3, $4, $4, 'brooding') RETURNING id`,
-      [`Batch ${anchorDate}${fields.house ? " " + fields.house : ""}`, house.rows[0]?.id || null,
-       anchorDate, Number(fields.count_placed) || 0]);
+      `INSERT INTO batches (species, name, house_location_id, placed_on, placed_count, current_count, stage, purpose)
+       VALUES ('poultry', $1, $2, $3, $4, $4, 'brooding', $5) RETURNING id`,
+      [planned.batch_label || `Batch ${anchorDate}${fields.house ? " " + fields.house : ""}`, houseRow.rows[0]?.id || null,
+       anchorDate, Number(fields.count_placed) || 0, planned.purpose || fields.purpose || null]);
     subjectType = "batch";
     subjectId = b.rows[0].id;
   }

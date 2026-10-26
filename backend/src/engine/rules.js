@@ -7,24 +7,37 @@ import { waterBalance } from "./physics.js";
 import { notify } from "../workers/notifier.js";
 import { farmDateStr, addDays, farmTime } from "../util/time.js";
 
-async function releaseTemplateNow(c, code, { params = {}, priorityOverride = null, assigneeRole = null, subjectId = null } = {}) {
+// Release a template now (triggers, plans, owner-released project steps). A
+// periodKey makes the release idempotent: a plan step is never released twice.
+export async function releaseTemplateNow(c, code, {
+  params = {}, priorityOverride = null, assigneeRole = null, subjectId = null, periodKey: fixedKey = null,
+  title = null, dueAt = null,
+} = {}) {
   const t = await c.query(`SELECT * FROM task_templates WHERE code = $1 AND active ORDER BY version DESC LIMIT 1`, [code]);
   if (!t.rows.length) return null;
   const tpl = t.rows[0];
+  if (fixedKey) {
+    const seen = await c.query(`SELECT id FROM task_instances WHERE template_id = $1 AND period_key = $2`, [tpl.id, fixedKey]);
+    if (seen.rows.length) return null;
+  }
+  if (tpl.code === "C-E1" && !params.rotation) {
+    const { rotationHint } = await import("./plans.js");
+    params = { ...params, rotation: await rotationHint(c) };
+  }
   const user = await c.query(
     `SELECT id FROM users WHERE role = $1 AND active ORDER BY created_at LIMIT 1`,
     [assigneeRole || tpl.evidence_policy?.assignee_role || "caretaker"]);
   const dateStr = farmDateStr();
-  const periodKey = `${dateStr}:trigger:${randomUUID().slice(0, 8)}`;
+  const periodKey = fixedKey || `${dateStr}:trigger:${randomUUID().slice(0, 8)}`;
   const now = new Date();
-  const due = new Date(now.getTime() + (tpl.priority === "P0" ? 30 : 4 * 60) * 60_000);
+  const due = dueAt ? new Date(dueAt) : new Date(now.getTime() + (tpl.priority === "P0" ? 30 : 4 * 60) * 60_000);
   const r = await c.query(
     `INSERT INTO task_instances
        (template_id, template_code, template_version, period_key, subject_type, subject_id, assignee_id,
         title, priority, est_minutes, params, release_at, due_at, grace_until, state)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'scheduled') RETURNING id`,
     [tpl.id, tpl.code, tpl.version, periodKey, tpl.subject_type, subjectId || tpl.default_subject_id,
-     user.rows[0]?.id || null, tpl.title, priorityOverride || tpl.priority, tpl.est_minutes,
+     user.rows[0]?.id || null, title || tpl.title, priorityOverride || tpl.priority, tpl.est_minutes,
      JSON.stringify(params), now, due, new Date(due.getTime() + 60 * 60_000)]);
   await foldEvent(c, {
     event_uuid: randomUUID(), instance_id: r.rows[0].id, actor_type: "system",

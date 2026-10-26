@@ -134,6 +134,7 @@ export const ASSETS = [
   { code: "TANK-MAIN", name: "Main tank", kind: "tank", criticality: "P0" },
   { code: "POOL-1", name: "Storage pool", kind: "pool", criticality: "P1" },
   { code: "DRIP-SYS", name: "Drip irrigation system", kind: "drip_block", criticality: "P1" },
+  { code: "RETIC-MAIN", name: "Reticulation mainline (40 mm PVC and sprinklers, upgrading to 63 mm HDPE and drip)", kind: "pipeline", criticality: "P1" },
   { code: "SPRAY-K1", name: "Knapsack sprayer 1", kind: "sprayer", criticality: "P2" },
   { code: "RAIN-G1", name: "Rain gauge", kind: "tool", criticality: "P2" },
   { code: "GEN-1", name: "Generator", kind: "generator", criticality: "P1", meters: { gen_run_hours: 0 } },
@@ -152,17 +153,19 @@ export const LOCATIONS = [
   // Land use (owner, Oct 2026): the 2 ha homestead garden is the only land in
   // use (crop split to follow); about 5 ha is lost to mining; the rest is to be
   // cleared and may be grazed meanwhile. 2 + 112.2 + 5 = 119.2 ha.
-  { code: "HOMESTEAD", name: "Homestead garden", kind: "zone", crop: "kale, rape, tomato, onion (split to follow)", irrigated: true, hectares: 2, soil: "Composted loam", status: "active" },
+  { code: "HOMESTEAD", name: "Homestead garden", kind: "zone", crop: "kale, rape, tomato Rodade, onion Texas Grano, sorghum SV4, maize (split to follow)", irrigated: true, hectares: 2, soil: "Composted loam", status: "active" },
   { code: "UNCLEARED", name: "Land to clear (grazing meanwhile)", kind: "paddock", hectares: 112.2, soil: "Mixed", status: "to clear" },
   { code: "MINING", name: "Lost to mining activity", kind: "zone", hectares: 5, status: "lost" },
   // Beds inside the homestead garden. They keep their codes because tasks
   // (C-01 kale harvest, C-05 scouting) and the irrigation planner refer to them;
   // their area is part of the homestead's 2 ha.
   { code: "BLK-A", name: "Homestead garden: kale and rape beds", kind: "block", crop: "kale+rape", plant_count: 10000, irrigated: true, soil: "Composted loam" },
-  { code: "BLK-B", name: "Homestead garden: tomato and onion beds", kind: "block", crop: "tomato+onion", plant_count: 2500, irrigated: true, soil: "Composted loam" },
+  { code: "BLK-B", name: "Homestead garden: tomato (Rodade) and onion (Texas Grano) beds", kind: "block", crop: "tomato Rodade+onion Texas Grano", plant_count: 2500, irrigated: true, soil: "Composted loam" },
+  // Maize and sorghum: rain-fed beds in the homestead garden. The maize was
+  // treated for fall armyworm with emamectin benzoate (IRAC group 6).
+  { code: "BLK-C", name: "Homestead garden: maize and sorghum (SV4) beds", kind: "block", crop: "maize+sorghum SV4", rainfed_capable: true, soil: "Composted loam" },
   // Earlier field-map blocks not in use. Kept (old records point at them) but
   // retired: no area, no crop, out of the irrigation planner.
-  { code: "BLK-C", name: "Block C (retired)", kind: "block", status: "retired" },
   { code: "BLK-D", name: "Block D (retired)", kind: "block", status: "retired" },
   { code: "BLK-E", name: "Block E (retired)", kind: "block", status: "retired" },
   { code: "ORCHARD", name: "Orchard area (retired)", kind: "zone", status: "retired" },
@@ -177,15 +180,14 @@ export const LOCATIONS = [
   { code: "PIGGERY", name: "Piggery", kind: "zone" },
 ];
 
-// Real herd composition. The cattle operate as one 30-head herd for the
-// 90-day rehabilitation programme (spec 2.6) and K-task scheduling; the
-// Brahman/Mashona split and paddocks live on the record.
+// Herds. The cattle (Nguni and Sanga, owner's farm brief) run as one herd for
+// the 90-day rehabilitation programme (spec 2.6) and K-task scheduling.
 export const HERDS = [
   {
     name: "Main herd", species: "cattle", head_count: 30,
-    breed: "Brahman 18 + Mashona 12",
-    location: "Paddock 1 (Brahman), Paddock 2 (Mashona)",
-    notes: "Brahman breeding herd: 1 bull, 15 cows, 2 heifers. Mashona indigenous herd, low maintenance. 90-day rehabilitation programme active, target BCS 2.5 to 3.0.",
+    breed: "Nguni and Sanga",
+    location: "Paddock 1 and Paddock 2",
+    notes: "Indigenous Nguni and Sanga cattle at body condition score around 2.5, on the 90-day rehabilitation ration; target BCS 3.0. Head count and breed split to confirm.",
   },
   {
     name: "Goat herd", species: "goats", head_count: 35,
@@ -242,3 +244,50 @@ export const INVENTORY = [
   { name: "NPK 2:3:2", unit: "kg", category: "chemical", on_hand: 200, reorder_point: 50, reorder_qty: 200 },
   { name: "Drip acid cleaner", unit: "L", category: "chemical", on_hand: 10, reorder_point: 4, reorder_qty: 10 },
 ];
+
+// ── The July 2026 to June 2027 scaling plan ──────────────────────────────────
+// Kale is the cash engine: $1 a bundle, about 50 bundles a day now, scaling to
+// 10,000 plants in continuous production (330 to 400 bundles a day, $10,000 to
+// $12,000 a month).
+export const KALE_PLAN = {
+  price_usd_per_bundle: 1,
+  baseline_bundles_per_day: 50,
+  target_plants: 10000,
+  target_bundles_per_day: [330, 400],
+  target_revenue_usd_month: [10000, 12000],
+  bed_size_plants: 800,
+  transplant_cadence: "one 800-plant bed a week (C-06)",
+};
+
+// Black Australorp layers through staggered hatching: 150-bird batches every
+// six weeks from November 2026. With the 250 layers on hand and about 5%
+// rearing loss this passes 1,000 layers; batches lay from about week 20.
+export const POULTRY_PLAN = {
+  breed: "Black Australorp",
+  target_layers: 1000,
+  batch_size: 150,
+  order_lead_days: 21,
+  house_rotation: ["HOUSE-2", "HOUSE-1"],
+  placements: ["2026-11-03", "2026-12-15", "2027-01-26", "2027-03-09", "2027-04-20", "2027-06-01"],
+};
+
+// Last fall armyworm treatment on record, for the rotation check. The farm
+// brief records emamectin benzoate on the maize; the date is to confirm.
+export const FAW_HISTORY = [
+  { product: "Emamectin benzoate", irac_group: "6", block: "BLK-C", date: null, note: "maize treated for fall armyworm (farm brief)" },
+];
+
+// Milestones the owner reads progress against. Status is computed from farm
+// data where it can be (see engine/plans.js); the rest the owner marks.
+export const SCALING_PLAN = {
+  from: "2026-07-01",
+  to: "2027-06-30",
+  milestones: [
+    { key: "phase0_tank", title: "Phase 0: main tank rehabilitated and its usable volume measured", target: "2026-12-15", project: "phase0_tank" },
+    { key: "reticulation", title: "Reticulation on 63 mm HDPE mainline and drip; 40 mm PVC sprinklers retired", target: "2027-03-31", project: "reticulation" },
+    { key: "kale_10k", title: "Kale at 10,000 plants, 330 to 400 bundles a day ($10,000 to $12,000 a month)", target: "2027-06-30" },
+    { key: "layers_1000", title: "1,000+ Black Australorp layers through staggered hatching", target: "2027-06-30" },
+    { key: "cattle_bcs", title: "Cattle from BCS about 2.5 to 3.0 on the 90-day rehabilitation ration", target: "2027-01-31" },
+    { key: "summer_crops", title: "Sorghum SV4 and maize planted with the effective rains", target: "2026-12-15" },
+  ],
+};

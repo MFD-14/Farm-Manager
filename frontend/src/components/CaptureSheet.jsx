@@ -90,6 +90,17 @@ export default function CaptureSheet({ instance, onClose }) {
 
         {instance.retake_reason && <div className="retake">Sent back: {instance.retake_reason}</div>}
 
+        {instance.params?.rotation?.last_product && isOpen && (
+          <div className="retake">
+            Last fall armyworm spray: {instance.params.rotation.last_product}
+            {instance.params.rotation.last_irac_group ? ` (group ${instance.params.rotation.last_irac_group})` : ""}.
+            {" "}Use a different group
+            {instance.params.rotation.use_instead?.length
+              ? `: ${instance.params.rotation.use_instead.filter((o) => o.in_stock).map((o) => `${o.product} (group ${o.irac_group})`).join(" or ") || "none in stock, ask the owner"}`
+              : ""}.
+          </div>
+        )}
+
         {rainAhead && isOpen && (
           <div className="retake">
             Rain forecast ({rainAhead.rain_mm} mm, {rainAhead.prob_pct}%) within 24–48 h —

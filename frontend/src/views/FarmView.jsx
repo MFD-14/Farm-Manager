@@ -4,6 +4,7 @@
 import React, { useEffect, useState } from "react";
 import { apiJson } from "../lib/api.js";
 import { metaGet, metaSet } from "../lib/db.js";
+import PlanSection from "../components/PlanSection.jsx";
 
 const STATUS_CHIP = { active: "state-verified_closed", planted: "P2", fallow: "P3", planned: "state-released", reserve: "P3",
   "to clear": "state-released", lost: "P1" };
@@ -41,6 +42,8 @@ export default function FarmView() {
         <div className="stat"><div className="v">{farm.cropped_ha}</div><div className="l">cropped ha</div></div>
         <div className="stat"><div className="v">{livestock.totals.cattle + livestock.totals.goats + livestock.totals.pigs}</div><div className="l">head stock</div></div>
       </div>
+
+      <PlanSection />
 
       <div className="section-title">Water system</div>
       <div className="card">

@@ -37,24 +37,26 @@ test("land use: 2 ha homestead garden in use, the rest to clear, 5 ha lost to mi
   assert.equal(f.farm.cropped_ha, 2, "only the homestead garden is cropped");
 });
 
-test("retired field-map blocks leave the irrigation planner; maize tasks are off once", async () => {
+test("homestead beds feed the irrigation planner; maize and sorghum tasks are on", async () => {
   const irrigated = (await q(`SELECT code FROM locations WHERE kind = 'block' AND irrigated ORDER BY code`)).rows;
-  assert.deepEqual(irrigated.map((r) => r.code), ["BLK-A", "BLK-B"], "homestead beds only");
-  const off = (await q(`SELECT code, active FROM task_templates WHERE code IN ('C-04', 'C-09') ORDER BY code`)).rows;
-  assert.deepEqual(off.map((r) => r.active), [false, false]);
-  // An owner switching one back on survives the next restart's seed.
-  await q(`UPDATE task_templates SET active = true WHERE code = 'C-04'`);
-  await seed({ withUsers: false });
-  assert.equal((await q(`SELECT active FROM task_templates WHERE code = 'C-04'`)).rows[0].active, true);
+  assert.deepEqual(irrigated.map((r) => r.code), ["BLK-A", "BLK-B"], "drip beds; maize and sorghum are rain-fed");
+  const maize = (await q(`SELECT name, crop FROM locations WHERE code = 'BLK-C'`)).rows[0];
+  assert.match(maize.name, /maize and sorghum/);
+  const on = (await q(`SELECT code, active FROM task_templates WHERE code IN ('C-04', 'C-09') ORDER BY code`)).rows;
+  assert.deepEqual(on.map((r) => r.active), [true, true]);
+  // An owner switching one off survives the next restart's seed.
   await q(`UPDATE task_templates SET active = false WHERE code = 'C-04'`);
+  await seed({ withUsers: false });
+  assert.equal((await q(`SELECT active FROM task_templates WHERE code = 'C-04'`)).rows[0].active, false);
+  await q(`UPDATE task_templates SET active = true WHERE code = 'C-04'`);
 });
 
 test("livestock: cattle herd split, goats, pigs and both poultry flocks", async () => {
   const f = await farm();
   assert.deepEqual(f.livestock.totals, { cattle: 30, goats: 35, pigs: 8, poultry: 350 });
   const cattle = f.livestock.herds.find((h) => h.species === "cattle");
-  assert.match(cattle.breed, /Brahman 18/);
-  assert.match(cattle.breed, /Mashona 12/);
+  assert.equal(cattle.breed, "Nguni and Sanga");
+  assert.match(cattle.notes, /body condition score around 2\.5/);
   const layers = f.livestock.flocks.find((x) => x.purpose === "layers");
   assert.equal(layers.current_count, 250);
   assert.equal(layers.house, "Poultry House A");

@@ -150,7 +150,7 @@ export const TEMPLATES = [
     schedule: { type: "calendar", freq: "weekly", byday: ["TH"], at: ["08:00"], fixed: true },
   },
   {
-    code: "C-04", title: "Fall armyworm scout, maize block", domain: "C", priority: "P1", est_minutes: 3,
+    code: "C-04", title: "Fall armyworm scout, maize bed", domain: "C", priority: "P1", est_minutes: 3,
     subject_type: "location", subject_code: "BLK-C",
     evidence_policy: E.E1E2([
       num("plants_inspected", "Plants inspected", 1, 1000),
@@ -283,7 +283,7 @@ export const TEMPLATES = [
     schedule: null, // released by season plan
   },
   {
-    code: "C-09", title: "Planting: sorghum SV4, maize", domain: "C", priority: "P1", est_minutes: 2,
+    code: "C-09", title: "Planting: sorghum SV4, maize (homestead garden beds)", domain: "C", priority: "P1", est_minutes: 2,
     subject_type: "location",
     evidence_policy: E.E1E2([text("variety", "Variety"), num("seed_rate", "Seed rate", 0, 100), text("block", "Block")]),
     schedule: null, // owner-released with effective rains, November window
@@ -348,6 +348,7 @@ export const TEMPLATES = [
     guards: [{ type: "calibration", asset_code: "SPRAY-K1", template: "A-04" }, { type: "phi_block" }],
     inventory_out: { item_from: "product", qty_from: "rate" },
     rotation_register: ["emamectin benzoate (IRAC 6)", "chlorantraniliprole (IRAC 28)", "spinetoram (IRAC 5)"],
+    instructions: [{ text: "Use a different insecticide group from the last fall armyworm spray (shown on this task). Spraying the same group twice in a row is flagged." }],
   },
   {
     code: "C-E2", title: "Replant or gap-fill", domain: "C", priority: "P2", est_minutes: 2,
@@ -392,6 +393,74 @@ export const TEMPLATES = [
     evidence_policy: E.E2(),
     schedule: null, assignee_role: "owner",
     inventory_in: true,
+  },
+
+  // ── Projects in the July 2026 to June 2027 scaling plan (owner-released steps) ──
+  // Phase 0: the main tank (80,000 to 125,000 L) leaks; rehabilitate it and
+  // measure the usable volume, which then replaces the range everywhere.
+  {
+    code: "A-P1", title: "Phase 0: drain and inspect the main tank", domain: "A", priority: "P1", est_minutes: 3,
+    subject_type: "asset", subject_code: "TANK-MAIN", project: "phase0_tank",
+    evidence_policy: { ...E.E1E2([text("cracks_found", "Cracks or leaks found (where)"), text("condition", "Floor and wall condition")], null, 2) },
+    schedule: null,
+    instructions: [{ text: "Run the tank down into the pool first (the pool carries the farm meanwhile). Photograph every crack and the floor." }],
+  },
+  {
+    code: "A-P2", title: "Phase 0: repair and reline the main tank", domain: "A", priority: "P1", est_minutes: 3,
+    subject_type: "asset", subject_code: "TANK-MAIN", project: "phase0_tank",
+    evidence_policy: { classes: ["E1", "E3"], photo_min: 2, pair: true, fields: [text("materials", "Materials used")] },
+    schedule: null,
+    instructions: [{ text: "Before and after photos of each repaired section, same angle." }],
+  },
+  {
+    code: "A-P3", title: "Phase 0: refill and 48-hour leak test", domain: "A", priority: "P1", est_minutes: 2,
+    subject_type: "asset", subject_code: "TANK-MAIN", project: "phase0_tank",
+    evidence_policy: E.E1E2([num("level_start_pct", "Level at start %", 0, 100, "%"), num("level_48h_pct", "Level after 48 h %", 0, 100, "%")]),
+    schedule: null,
+    readings: [{ metric: "tank_leak_test_start_pct", from: "level_start_pct" }, { metric: "tank_leak_test_48h_pct", from: "level_48h_pct" }],
+    instructions: [{ text: "Fill, close the outlet, note the level; read it again 48 hours later with no draw-off. Photo of the gauge both times." }],
+  },
+  {
+    code: "A-P4", title: "Phase 0: measure the usable tank volume", domain: "A", priority: "P1", est_minutes: 3,
+    subject_type: "asset", subject_code: "TANK-MAIN", project: "phase0_tank",
+    evidence_policy: E.E1E2([num("usable_litres", "Usable volume (litres)", 20000, 200000, "L"), text("method", "How measured (dimensions or metered fill)")]),
+    schedule: null,
+    readings: [{ metric: "tank_usable_measured_l", from: "usable_litres" }],
+    instructions: [{ text: "From outlet level to overflow: measure inside dimensions or meter a fill. This figure replaces the 80,000 to 125,000 L estimate." }],
+  },
+  // Reticulation: 40 mm PVC and sprinklers to 63 mm HDPE mainline and drip.
+  {
+    code: "A-P5", title: "Reticulation upgrade: lay 63 mm HDPE mainline section", domain: "A", priority: "P2", est_minutes: 2,
+    subject_type: "asset", subject_code: "RETIC-MAIN", project: "reticulation",
+    evidence_policy: E.E1E2([text("section", "Section (from, to)"), num("metres", "Metres laid", 0, 2000, "m")]),
+    schedule: null,
+    instructions: [{ text: "Photo of the trench with pipe laid before backfill, and of each fitting." }],
+  },
+  {
+    code: "A-P6", title: "Reticulation upgrade: install drip laterals on a bed", domain: "A", priority: "P2", est_minutes: 2,
+    subject_type: "asset", subject_code: "RETIC-MAIN", project: "reticulation",
+    evidence_policy: E.E1E2([text("bed", "Bed or block"), num("laterals", "Laterals", 0, 500), num("emitters", "Emitters", 0, 20000)]),
+    schedule: null,
+  },
+  {
+    code: "A-P7", title: "Reticulation upgrade: flush and pressure test", domain: "A", priority: "P2", est_minutes: 2,
+    subject_type: "asset", subject_code: "RETIC-MAIN", project: "reticulation",
+    evidence_policy: E.E1E2([num("pressure_bar", "Pressure (bar)", 0, 10, "bar"), text("leaks", "Leaks found and fixed")]),
+    schedule: null,
+    instructions: [{ text: "Flush laterals until clear, then hold pressure 30 minutes. Photo of the gauge and the end of a lateral running clear." }],
+  },
+  {
+    code: "A-P8", title: "Reticulation upgrade: retire the 40 mm PVC sprinkler line", domain: "A", priority: "P3", est_minutes: 2,
+    subject_type: "asset", subject_code: "RETIC-MAIN", project: "reticulation",
+    evidence_policy: E.E2(null, 1),
+    schedule: null,
+  },
+  // Poultry scaling: staggered hatching toward 1,000+ Black Australorp layers.
+  {
+    code: "P-09", title: "Order day-old chicks for the next planned batch", domain: "P", priority: "P1", est_minutes: 2,
+    evidence_policy: E.E1([text("supplier", "Supplier"), num("count_ordered", "Chicks ordered", 0, 5000), text("delivery_date", "Delivery date")]),
+    schedule: null, assignee_role: "owner",
+    instructions: [{ text: "Released by the poultry plan three weeks before a placement. Confirm the brooder house is free on the delivery date." }],
   },
 ];
 

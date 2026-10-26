@@ -14,13 +14,21 @@ export async function computeKpis(c, { days = 7 } = {}) {
        COUNT(*) FILTER (WHERE state IN ('verified_closed','skipped')) AS terminal_positive
      FROM task_instances WHERE release_at >= $1 AND state <> 'scheduled'`, [since]);
 
-  const autoVerify = await one(
+  // Acceptance (manual verification): how quickly evidence is accepted, and
+  // how often it goes through first time.
+  const acceptance = await one(
     `SELECT
-       COUNT(*) FILTER (WHERE verification->>'method' IN ('vim','media_present')) AS auto,
-       COUNT(*) FILTER (WHERE state = 'verified_closed'
-                        AND (evidence_summary->'media') IS NOT NULL
-                        AND jsonb_array_length(COALESCE(evidence_summary->'media','[]'::jsonb)) > 0) AS evidence_bearing
-     FROM task_instances WHERE closed_at >= $1`, [since]);
+       COUNT(*) FILTER (WHERE ti.verification->>'method' = 'accepted') AS accepted,
+       COUNT(*) FILTER (WHERE ti.verification->>'method' = 'accepted' AND ti.rejection_count = 0) AS first_time,
+       percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (ti.closed_at - d.reported)) / 3600)
+         FILTER (WHERE ti.verification->>'method' = 'accepted') AS median_hours
+     FROM task_instances ti
+     LEFT JOIN LATERAL (SELECT max(server_time) AS reported FROM task_events e
+                        WHERE e.instance_id = ti.id AND e.type = 'done_reported') d ON true
+     WHERE ti.closed_at >= $1`, [since]);
+  const sentBack = await one(
+    `SELECT COUNT(*) AS n FROM task_events WHERE type = 'rejected_reopened' AND server_time >= $1`, [since]);
+  const waiting = await one(`SELECT COUNT(*) AS n FROM task_instances WHERE state = 'needs_review'`);
 
   const integrity = await one(
     `SELECT COUNT(*) AS flags FROM task_events
@@ -54,13 +62,9 @@ export async function computeKpis(c, { days = 7 } = {}) {
      FROM task_instances ti JOIN task_templates tt ON tt.id = ti.template_id
      WHERE tt.domain = 'A' AND ti.release_at >= $1 AND ti.state <> 'scheduled'`, [since]);
 
-  const vimAgreement = await one(
-    `SELECT COUNT(*) FILTER (WHERE agree) AS agree, COUNT(*) AS total FROM (
-       SELECT (v.verdict = 'pass') = (ti.state = 'verified_closed') AS agree
-       FROM vim_verdicts v JOIN task_instances ti ON ti.id = v.instance_id
-       WHERE ti.state IN ('verified_closed','released') AND v.decided_at >= $1
-         AND ti.verification->>'method' IN ('owner')
-     ) x`, [since]);
+  const kalePlan = (await c.query(`SELECT value FROM farm_settings WHERE key = 'kale_plan'`)).rows[0]?.value || {};
+  const layersNow = await one(
+    `SELECT COALESCE(SUM(current_count), 0) AS n FROM batches WHERE purpose = 'layers' AND stage <> 'closed'`);
 
   const escalations = await one(
     `SELECT COUNT(*) AS n FROM notifications_log WHERE sent_at >= $1 AND rung LIKE 'overdue%'`, [since]);
@@ -74,10 +78,17 @@ export async function computeKpis(c, { days = 7 } = {}) {
     period_days: days,
     on_time_verified_p1_pct: pct(completion.p1_on_time, completion.p1_released),
     overall_completion_pct: pct(completion.terminal_positive, completion.released),
-    auto_verification_pct: pct(autoVerify.auto, autoVerify.evidence_bearing),
+    accepted_first_time_pct: pct(acceptance.first_time, acceptance.accepted),
+    median_hours_to_accept: acceptance.median_hours !== null && acceptance.median_hours !== undefined
+      ? Math.round(Number(acceptance.median_hours) * 10) / 10 : null,
+    sent_back: Number(sentBack.n),
+    waiting_for_acceptance: Number(waiting.n),
     evidence_integrity_flags: Number(integrity.flags),
     median_sync_latency_s: sync.median_s !== null ? Math.round(Number(sync.median_s)) : null,
     kale_bundles_daily_mean: Math.round(bundles.mean * 10) / 10,
+    kale_target_bundles_per_day: kalePlan.target_bundles_per_day?.[0] || 330,
+    revenue_monthly_run_rate_usd: Math.round((sales.sum / days) * 30),
+    layers_now: Number(layersNow.n),
     revenue_recorded_usd: sales.sum,
     water_pumped_l: pumpHours.sum * 6000,
     irrigation_litres: irrigation.sum,
@@ -86,7 +97,6 @@ export async function computeKpis(c, { days = 7 } = {}) {
     poultry_mortality_sum: mortality.sum,
     eggs_sum: eggs.sum,
     pm_compliance_pct: pct(pmCompliance.on_time, pmCompliance.total),
-    vim_agreement_pct: pct(vimAgreement.agree, vimAgreement.total),
     escalations_to_owner: Number(escalations.n),
     dark_farm_incidents: Number(darkFarm.n),
   };
