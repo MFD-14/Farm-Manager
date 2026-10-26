@@ -79,18 +79,19 @@ syncRouter.post("/events", auth(), async (req, res) => {
   });
 });
 
-// GET /api/sync/notes[?kind=clock] — farm-level entries not tied to a task,
-// sent through the outbox as field_recorded events: notes (with media) or
-// clock-ins and clock-outs for Time & Attendance.
+// GET /api/sync/notes[?kind=clock|record] — farm-level entries not tied to a
+// task, sent through the outbox as field_recorded events: notes (with media),
+// clock-ins and clock-outs, or records (harvests, plantings, activities, feed,
+// health and breeding).
 syncRouter.get("/notes", auth(), async (req, res) => {
-  const key = req.query.kind === "clock" ? "clock" : "note";
+  const key = ["clock", "record"].includes(req.query.kind) ? req.query.kind : "note";
   const r = await q(
-    `SELECT e.event_uuid, e.payload->>$1 AS ${key}, e.device_time, e.server_time, u.name AS by,
+    `SELECT e.event_uuid, e.payload->$1 AS ${key}, e.device_time, e.server_time, u.name AS by,
        COALESCE((SELECT json_agg(json_build_object('media_uuid', m.media_uuid, 'kind', m.kind, 'status', m.status))
                  FROM media_objects m WHERE m.media_uuid::text IN (SELECT jsonb_array_elements_text(e.payload->'media'))), '[]') AS media
      FROM task_events e LEFT JOIN users u ON u.id = e.actor_id
      WHERE e.instance_id IS NULL AND e.type = 'field_recorded' AND e.payload ? $1
-     ORDER BY e.server_time DESC LIMIT 100`, [key]);
+     ORDER BY e.server_time DESC LIMIT ${key === "record" ? 500 : 100}`, [key]);
   res.json({ notes: r.rows });
 });
 
@@ -119,6 +120,7 @@ syncRouter.get("/bundle", auth(), async (req, res) => {
     assets: (await q(`SELECT id, code, name, kind, criticality FROM assets WHERE status = 'active'`)).rows,
     locations: (await q(`SELECT id, code, name, kind, crop, plant_count, status, geom, geom_meta, geom_proposed FROM locations`)).rows,
     batches: (await q(`SELECT id, name, placed_on, current_count, stage FROM batches`)).rows,
+    herds: (await q(`SELECT id, name, species, breed, head_count FROM herds`)).rows,
     inventory: (await q(`SELECT id, name, unit, category, on_hand, reorder_point FROM inventory_items`)).rows,
   };
 

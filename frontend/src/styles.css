@@ -492,7 +492,25 @@ button { font-family:var(--fb); cursor:pointer; }
 .warn-text { color:var(--r5); }
 .fab { position:fixed; right:18px; bottom:calc(20px + env(safe-area-inset-bottom)); width:56px; height:56px; border-radius:50%;
   border:none; background:var(--g7); color:#fff; font-size:30px; box-shadow:var(--sm); z-index:30; }
-.fab-menu { position:fixed; right:18px; bottom:calc(86px + env(safe-area-inset-bottom)); background:var(--sf); border-radius:12px;
-  box-shadow:var(--sm); z-index:30; display:flex; flex-direction:column; min-width:180px; }
-.fab-menu button { background:none; border:none; text-align:left; padding:14px 18px; font-size:16px; border-bottom:1px solid var(--bl); }
+.add-item { display:flex; align-items:center; gap:14px; width:100%; padding:14px 16px; margin-bottom:8px; border-radius:12px;
+  border:1px solid var(--g1); background:var(--g0); color:var(--g8); font-size:16px; font-weight:600; text-align:left; }
+.add-item span { flex:1; } .add-item b { color:var(--tm); font-size:20px; }
+.form-field { display:block; margin-bottom:8px; }
+.form-field > span { display:block; font-size:12px; font-weight:700; color:var(--ts); text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+.form-field .note-input { margin-bottom:0; }
+.form-field small { display:block; margin-top:2px; }
+.note-input.invalid { border-color:var(--r5); }
+.unit-row { display:flex; gap:8px; } .unit-row > :first-child { flex:2; } .unit-row > select { flex:1; }
 .btn.block + .stat-row { margin-top:12px; }
+.tabs-inline { display:flex; background:var(--bl); border-radius:12px; padding:3px; margin:10px 0; }
+.tabs-inline button { flex:1; border:none; background:none; padding:9px; border-radius:10px; font-weight:700; color:var(--ts); font-size:14px; }
+.tabs-inline button.on { background:var(--g7); color:#fff; }
+.chips { display:flex; gap:6px; overflow-x:auto; margin:4px 0 6px; padding-bottom:2px; }
+.chips button { border:1px solid var(--bd); background:var(--sf); border-radius:20px; padding:6px 14px; font-size:13px; white-space:nowrap; color:var(--ts); }
+.chips button.on { background:var(--g7); border-color:var(--g7); color:#fff; }
+.card.hero { background:linear-gradient(135deg, var(--g7), var(--g8)); color:#fff; display:flex; flex-direction:column; gap:2px; }
+.card.hero::before { display:none; }
+.card.hero small { opacity:.8; text-transform:uppercase; letter-spacing:.6px; font-size:11px; }
+.card.hero b { font-size:20px; font-family:var(--fd); }
+.title-row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.title-row .daytitle { margin:0; } .title-row .btn { padding:8px 14px; white-space:nowrap; }

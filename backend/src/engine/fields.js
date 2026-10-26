@@ -55,3 +55,18 @@ export async function applyOutline(c, event) {
     await c.query(`UPDATE locations SET geom_proposed = $2 WHERE id = $1`, [id, { geometry: geom, ...meta(geom) }]);
   }
 }
+
+// "Add field" from the record form (owners and task managers): a named bed or
+// field with its size; an outline can follow from Google Earth or a walk.
+const TO_HA = { ha: 1, acres: 0.404686, "m²": 0.0001 };
+export async function addField(c, event) {
+  if (!["owner", "manager"].includes(event.actor_type)) return;
+  const r = event.payload.record;
+  const name = String(r.name || "").trim().slice(0, 120);
+  if (!name) return;
+  const ha = Number(r.size) * (TO_HA[r.size_unit] || 1);
+  await c.query(
+    `INSERT INTO locations (code, name, kind, soil, crop, status, geom_meta) VALUES ($1, $2, 'block', $3, $4, 'active', $5)`,
+    [`FLD-${String(event.event_uuid).slice(0, 6).toUpperCase()}`, name, r.soil || null, r.crop || null,
+      ha > 0 ? { area_ha: Math.round(ha * 1000) / 1000, source: "entered", by: event.actor_id || null, at: event.device_time || null } : null]);
+}

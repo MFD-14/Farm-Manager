@@ -7,6 +7,8 @@ import { pullBundle } from "../lib/sync.js";
 import { apiJson, errorMessage } from "../lib/api.js";
 import { markSeen } from "../lib/capture.js";
 import CaptureSheet from "../components/CaptureSheet.jsx";
+import RecordForm, { AddSheet } from "../components/RecordForm.jsx";
+import { RECORD_TYPES } from "../lib/records.js";
 
 const PRIORITY_ORDER = { P0: 0, P1: 1, P2: 2, P3: 3 };
 const OPEN_STATES = new Set(["released", "acknowledged", "in_progress"]);
@@ -21,10 +23,12 @@ function fmtTime(d) {
 }
 
 // codes narrows the list (Field Walk: the walking and scouting tasks).
-// The + button adds a note (everyone) or releases a task that has no
-// schedule of its own (owners and task managers: projects, purchases, repairs).
+// The + button opens the add sheet: a note or a farm record (harvest,
+// planting, activity, feed, health, breeding) for everyone; releasing an
+// unscheduled task or adding a field for owners and task managers.
 export default function DayView({ onCountsChanged, codes, title, onAddNote, canAddTask, children }) {
   const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState(null);
   const [templates, setTemplates] = useState(null);
   const [addMsg, setAddMsg] = useState(null);
   const [instances, setInstances] = useState([]);
@@ -52,7 +56,7 @@ export default function DayView({ onCountsChanged, codes, title, onAddNote, canA
   }, [refresh]);
 
   async function pickTemplate() {
-    setAdding(false); setAddMsg(null);
+    setAddMsg(null);
     try {
       setTemplates((await apiJson("/api/templates")).templates.filter((t) => !t.schedule));
     } catch (e) { alert(errorMessage(e, "Adding a task needs signal.")); }
@@ -107,12 +111,14 @@ export default function DayView({ onCountsChanged, codes, title, onAddNote, canA
       {onAddNote && (
         <>
           {adding && (
-            <div className="fab-menu">
-              {canAddTask && <button type="button" onClick={pickTemplate}>Add task</button>}
-              <button type="button" onClick={onAddNote}>Add note</button>
-            </div>
+            <AddSheet onClose={() => setAdding(false)}
+              items={[...(canAddTask ? [{ key: "task", label: "Add task", icon: "M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" }] : []),
+                { key: "note", label: "Add note", icon: "M11 4H4v16h16v-7M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z" },
+                ...Object.entries(RECORD_TYPES).filter(([, d]) => canAddTask || !d.console).map(([key, d]) => ({ key, label: d.label, icon: d.icon }))]}
+              onPick={(key) => { setAdding(false); if (key === "task") pickTemplate(); else if (key === "note") onAddNote(); else setForm(key); }} />
           )}
-          <button type="button" className="fab" aria-label="Add" onClick={() => setAdding(!adding)}>+</button>
+          {form && <RecordForm type={form} onClose={(saved) => { setForm(null); if (saved) onCountsChanged?.(); }} />}
+          <button type="button" className="fab" aria-label="Add" onClick={() => setAdding(true)}>+</button>
         </>
       )}
       {templates && (

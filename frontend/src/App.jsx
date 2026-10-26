@@ -11,6 +11,7 @@ import NotesView from "./views/NotesView.jsx";
 import SalesView from "./views/SalesView.jsx";
 import LogsView from "./views/LogsView.jsx";
 import CropPlanView from "./views/CropPlanView.jsx";
+import LivestockView from "./views/LivestockView.jsx";
 import AboutSheet from "./components/AboutSheet.jsx";
 import AccountSheet, { PasswordForm } from "./components/AccountSheet.jsx";
 import PeopleSheet from "./components/PeopleSheet.jsx";
@@ -37,6 +38,7 @@ const MENU = [
   { key: "farm", sn: "Mepu yepurazi", label: "Farm Map", icon: "M1 6v16l7-4 8 4 7-4V2l-7 4-8-4zM8 2v16M16 6v16" },
   { key: "crop", sn: "Zvirimwa nechirimwa", label: "Crop Plan By Crop", icon: LEAF_ICON },
   { key: "cropmap", sn: "Zvirimwa nemepu", label: "Crop Plan By Map", icon: "M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11zM12 10h.01" },
+  { key: "livestock", sn: "Zvipfuyo", label: "Livestock", icon: "M4 10c0-3 2-5 5-5h6c3 0 5 2 5 5v4a4 4 0 01-4 4H8a4 4 0 01-4-4zM8 5V3M16 5V3M9 12h.01M15 12h.01" },
   { key: "attendance", sn: "Nguva nekuuya kubasa", label: "Time & Attendance", icon: "M12 7v5l3 3M12 21a9 9 0 110-18 9 9 0 010 18z" },
   { key: "walk", sn: "Kufamba mumunda", label: "Field Walk", icon: "M13 4h.01M7 21l3-6 3 2v4M10 15l1-6 4 3h3M11 9l-4 2v3" },
   { key: "logs", sn: "Zvakanyorwa", label: "Logs", icon: "M3 3v18h18M7 16l4-8 4 4 4-6" },
@@ -206,15 +208,16 @@ export default function App() {
     notes: () => <NotesView onCountsChanged={refreshCounts} />,
     sales: () => <SalesView onCountsChanged={refreshCounts} showRevenue={isConsole} />,
     farm: () => <FarmView isConsole={isConsole} />,
-    crop: () => <CropPlanView mode="crop" />,
-    cropmap: () => <CropPlanView mode="map" />,
+    crop: () => <CropPlanView mode="crop" showCosts={isConsole} />,
+    cropmap: () => <CropPlanView mode="map" showCosts={isConsole} />,
+    livestock: () => <LivestockView showCosts={isConsole} />,
     attendance: () => (
       <LogsView codes={ATTENDANCE} title="Time & Attendance" empty="No weekly sheet recorded yet (F-02 attendance and wage sheet).">
         <ClockCard user={user} onCountsChanged={refreshCounts} />
       </LogsView>
     ),
     walk: () => <DayView onCountsChanged={refreshCounts} codes={WALK} title="Field Walk"><WalkButton isConsole={isConsole} /></DayView>,
-    logs: () => <LogsView />,
+    logs: () => <LogsView showCosts={isConsole} />,
     rain: () => <RainView onCaptureToday={isConsole ? undefined : () => setTab("tasks")} />,
     water: () => <WaterView />,
     kpis: () => <OwnerView tab="kpis" />,
