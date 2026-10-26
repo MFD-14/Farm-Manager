@@ -55,6 +55,19 @@ export async function attachToTask(instance, mediaItems) {
   return patchInstance(instance.id, { extra_uploads: count });
 }
 
+// A farm note: an observation not tied to a task, with any photos, video or
+// voice notes. Queued like any other record and synced when there's signal.
+export async function saveNote(note, mediaItems) {
+  for (const m of mediaItems) {
+    await queueMedia({
+      media_uuid: m.media_uuid, instance_id: null, kind: m.kind, blob: m.blob, mime: m.blob?.type || null,
+      source: m.source || "camera", file_modified: m.file_modified || null, title: "Farm note",
+      captured_at: new Date().toISOString(), urgent: false,
+    });
+  }
+  await append(null, "field_recorded", { note, media: mediaItems.map((m) => m.media_uuid) });
+}
+
 export async function requestSkip(instance, reasonCode, note) {
   await append(instance.id, "skip_requested", { reason_code: reasonCode, note: note || null });
   return patchInstance(instance.id, { state: "skip_pending" });

@@ -466,9 +466,9 @@ rule { id, name, source (reading|task_event|forecast|inventory|clock),
 
 At the 10,000-plant kale target, crop demand peaks near 20,500 L/day against 36,000 L pumpable: feasible with about 40% headroom, but only about two days of buffer if the borehole stops, which is why W-01 is twice daily and T1 exists. Until Phase 0 measures the tank, buffer = 45,000 L pool + 80,000 L (the low end of the tank range, deliberately conservative).
 
-**Phase 2, FAO-56 checkbook (built, shipped disabled, switched on in the Water tab).** Per bed daily: `deficit = clamp(deficit + Kc x ET0 - rain - irrigation, 0, TAW)`; when the projected deficit crosses MAD x TAW, release a refill shift with `minutes = depth / (rate x efficiency)`, capped at 180 with the remainder carried. ET0 comes from the Open-Meteo forecast feed (04:15 daily), rain from W-08, applied water from completed W-03 shifts. Days on climate-normal ET0 are flagged. The ledger runs in shadow beside Phase 1 so the owner can compare before switching (R14).
+**Phase 2, FAO-56 checkbook (built, shipped disabled, switched on on the Water screen).** Per bed daily: `deficit = clamp(deficit + Kc x ET0 - rain - irrigation, 0, TAW)`; when the projected deficit crosses MAD x TAW, release a refill shift with `minutes = depth / (rate x efficiency)`, capped at 180 with the remainder carried. ET0 comes from the Open-Meteo forecast feed (04:15 daily), rain from W-08, applied water from completed W-03 shifts. Days on climate-normal ET0 are flagged. The ledger runs in shadow beside Phase 1 so the owner can compare before switching (R14).
 
-**After the reticulation upgrade:** 63 mm HDPE raises mainline capacity and drip replaces sprinklers; the A-P6 step records laterals and emitters per bed, and the owner updates the bed's `rate_mm_h` and `efficiency` in the Water tab (drip efficiency 0.9 against roughly 0.7 for sprinklers), which shortens planned run times by about a fifth for the same depth.
+**After the reticulation upgrade:** 63 mm HDPE raises mainline capacity and drip replaces sprinklers; the A-P6 step records laterals and emitters per bed, and the owner updates the bed's `rate_mm_h` and `efficiency` on the Water screen (drip efficiency 0.9 against roughly 0.7 for sprinklers), which shortens planned run times by about a fifth for the same depth.
 
 ### 3.6 Release, the daily plan, assignment and collisions (built)
 
@@ -480,7 +480,7 @@ At 04:45 the release engine evaluates S1 to S5, armed rules, guards and suppress
 2. Owner-role templates (F-E1 purchases, P-09 chick orders) go to the owner.
 3. Reminders follow the task's actual assignee (4.2); a reassignment is a `reassigned` event.
 4. The acceptance queue, skip requests and problem reports go to **owners and task managers** together; any one may decide (R48). The event records who and in which role.
-5. Owners and task managers see every task and can do field work themselves from the Tasks tab; caretakers see their own and unassigned tasks.
+5. Owners and task managers see every task and can do field work themselves from the Tasks screen; caretakers see their own and unassigned tasks.
 
 **Capacity and collisions.** P0 pre-empts and re-orders the plan. P1 never auto-defers; if P1 alone overflows the day, an owner exception lists a suggested cut before 06:00. P2 defers up to 2 days, P3 up to 7, each appending `deferred`. A task deferred 3 times escalates to the owner queue (starvation guard). Same-asset collisions link through `blocked_by`: a pump-fault repair blocks the filter flush, which shows as waiting, not missed. Every template's `est_minutes` counts phone interaction only; the normal day's sum stays under 15 minutes, and any capture flow over 60 seconds in field testing is split.
 
@@ -497,7 +497,7 @@ At 04:45 the release engine evaluates S1 to S5, armed rules, guards and suppress
 | Cattle BCS about 2.5 to 3.0 | 31 Jan 2027 | (latest median BCS - 2.5) / 0.5 |
 | Sorghum SV4 and maize planted | 15 Dec 2026 | A verified C-09 since 1 July 2026 |
 
-Status: done, on track (progress above zero, target not passed), behind (target passed), not started, or blocked (manual). The Farm tab shows each milestone with its bar, detail line and, for projects, the steps with a Release button (disabled while a step is already on the list). Targets are proposals for the owner to adjust.
+Status: done, on track (progress above zero, target not passed), behind (target passed), not started, or blocked (manual). The Farm Map screen shows each milestone with its bar, detail line and, for projects, the steps with a Release button (disabled while a step is already on the list). Targets are proposals for the owner to adjust.
 
 ---
 
@@ -527,7 +527,7 @@ All timers run server-side off the event log every five minutes; each rung fires
 
 **Missed twice running:** P0 and P1 send an owner alert immediately (`woodlands_owner_alert`: "C-01 Kale harvest was missed twice in a row"); P2 and P3 put a named exception in the digest.
 
-**Missed during the owner's absence (built).** The owner sets absence dates (and optionally a deputy contact) under the Farm tab. While active:
+**Missed during the owner's absence (built).** The owner sets absence dates (and optionally a deputy contact) on the Farm Map screen. While active:
 - rungs that would reach the owner go to the deputy if one is set; P0 always reaches the owner as well;
 - the digest keeps sending;
 - a skip request older than 48 hours with a listed reason (no water, no input in stock, rain, sick, other) is approved automatically and flagged for review on return;
@@ -762,6 +762,9 @@ POST /api/sync/events
   Rules: idempotent on event_uuid; actor_type set from the account's role; caretakers may send only
   field events (3.2), others are rejected with reason "not allowed for your role"; illegal transitions
   are rejected per event, never the batch.
+GET  /api/sync/notes  -> { notes: [{ event_uuid, note, device_time, server_time, by, media: [{ media_uuid, kind, status }] }] }
+                         (farm notes: field_recorded events with instance_id null and payload { note, media: [uuid] };
+                          written through POST /api/sync/events and media initiate without an instance)
 GET  /api/sync/bundle?date=  -> { date, plan: {...instances}, open_instances, templates_delta,
                                   reference_delta: { assets, locations, batches, inventory },
                                   active_windows, last_values }
@@ -863,7 +866,7 @@ Principle unchanged: **log before you automate, automate before you enforce.** E
 |-------|------|------------------|------|
 | R0 Live now | Done, October 2026 | Server on Google Cloud; owner account; caretaker sign-up and approval; daily taxonomy; offline capture; manual acceptance; WhatsApp once credentials are entered | Caretaker records W-01 twice daily and C-01 daily for 10 days; median sync under 12 h |
 | R1 Acceptance habit | Late Oct to mid Nov 2026 | Task manager account (if appointed); review queue worked daily; "accept all" for clean items; WhatsApp templates approved; morning list on | Median time to accept under 24 h; first-time acceptance at or above 80% |
-| R2 Phase 0 tracked | Nov to 15 Dec 2026 | A-P1 to A-P4 released from the Farm tab; A-05 baseline walk-round video; measured usable volume replaces the estimate (T1 recalibrates itself) | Phase 0 milestone shows Done with the measured litres |
+| R2 Phase 0 tracked | Nov to 15 Dec 2026 | A-P1 to A-P4 released from the Farm Map screen; A-05 baseline walk-round video; measured usable volume replaces the estimate (T1 recalibrates itself) | Phase 0 milestone shows Done with the measured litres |
 | R3 Rains and plantings | Nov 2026 to Jan 2027 | C-09 sorghum SV4 and maize with the effective rains; T2 rain rule; T3 armyworm with the rotation check; K-04 weekly tick control; first poultry placement 3 Nov (P-09 order released 13 Oct) | Two trigger firings handled end to end; no rotation breach accepted unreviewed |
 | R4 Reticulation and kale scale-up | Jan to Mar 2027 | A-P5 to A-P8; drip efficiency entered per bed; kale beds added toward 10,000 plants; FAO-56 ledger in shadow beside the tank budget | Reticulation milestone Done by 31 Mar 2027; planner and ledger agree within 15% |
 | R5 Scale and resilience | Apr to Jun 2027 | Poultry toward 1,000+ layers (placements to 1 Jun); VIM headless loop on video if VIM v1.1 is changed (7.3 item 5); absence drill during a real owner trip; spare handset restore drill | June 2027 month-end pack (F-04) produced from system data alone; kale at or near 330 bundles a day |
@@ -949,6 +952,7 @@ Status: **Built** (in this repository, tested), **Partial** (built with a named 
 | Photos not checked by Claude; uploaded and logged with the task; admin or task manager accepts | Built | 5.6; Claude integration removed |
 | Task manager role | Built | 3.2, 6.2, 9.1 |
 | Caretaker self sign-up, owner approval | Built | 6.2 |
+| App menu in the Tend layout: Dashboard, Tasks, Review, Notes, Farm Map, Crop Plan by Crop and by Map, Time & Attendance, Field Walk, Logs, Rain, Water, KPIs, Settings, Help | Built | Side menu; Notes (offline, with photos, video, voice), crop plan from the cached bundle, Time & Attendance from F-02 records, Field Walk as the day's walking and scouting tasks |
 | WhatsApp reminders, morning list, sent-back notices, owner alerts | Built (needs Meta credentials) | 4.4 |
 | Water: borehole 6,000 L/h, main tank 80,000 to 125,000 L, pool 45,000 L | Built | `water_params`; T1, T5; irrigation planner |
 | Phase 0 tank rehabilitation, measured usable volume | Built | A-P1 to A-P4; milestone; A-05 baseline |

@@ -19,7 +19,8 @@ function fmtTime(d) {
   return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 
-export default function DayView({ onCountsChanged }) {
+// codes narrows the list (Field Walk: the walking and scouting tasks).
+export default function DayView({ onCountsChanged, codes, title }) {
   const [instances, setInstances] = useState([]);
   const [active, setActive] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,9 +35,9 @@ export default function DayView({ onCountsChanged }) {
     list.sort((a, b) =>
       (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9) ||
       (timeOf(a)?.getTime() ?? 0) - (timeOf(b)?.getTime() ?? 0));
-    setInstances(list);
+    setInstances(codes ? list.filter((i) => codes.includes(i.template_code)) : list);
     setLoading(false);
-  }, []);
+  }, [codes]);
 
   useEffect(() => {
     refresh();
@@ -57,7 +58,7 @@ export default function DayView({ onCountsChanged }) {
 
   return (
     <div className="wrap">
-      <div className="daytitle">{today}</div>
+      <div className="daytitle">{title || today}</div>
       {windows.map((w, i) => (
         <div className="withhold-banner" key={i}>
           <b>{w.type === "phi" ? "Pre-harvest interval" : "Withdrawal"} active</b> · {w.subject_name}
@@ -66,7 +67,8 @@ export default function DayView({ onCountsChanged }) {
         </div>
       ))}
       {loading && <div className="empty">Loading plan…</div>}
-      {!loading && !instances.length && (
+      {!loading && !instances.length && codes && <div className="empty">No walks or scouting on the list today.</div>}
+      {!loading && !instances.length && !codes && (
         <div className="empty">
           No plan cached yet. Connect once to pull today&apos;s bundle.
           <button className="btn ghost block" onClick={() => pullBundle().then(refresh)}>Retry</button>

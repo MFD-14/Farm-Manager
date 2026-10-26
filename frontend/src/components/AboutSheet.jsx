@@ -1,6 +1,6 @@
-// About sheet: ownership, copyright, version, and the attributions the app's
-// data sources require. Opened from the header on every screen and from the
-// sign-in page.
+// Help and about: how to use the app, ownership, copyright, version, and the
+// attributions the app's data sources require. Opened from Help in the menu
+// and from the sign-in page.
 import React from "react";
 import { getServerUrl } from "../lib/api.js";
 
@@ -22,6 +22,15 @@ export default function AboutSheet({ onClose, user }) {
         </div>
         <h2>Woodlands Farm Manager</h2>
         <div className="code">Version {__APP_VERSION__}{native ? " · Android app" : " · Web app"}</div>
+
+        <div className="section-title">Help</div>
+        <ul className="about-text help-list">
+          <li><b>Tasks</b>: tap a task, record the numbers and photos it asks for, then Done. It works with no signal.</li>
+          <li><b>Notes</b>: anything worth recording that isn&apos;t a task, with photos, video or a voice note.</li>
+          <li><b>Syncing</b>: the badge at the top shows what is waiting; tap it to see each upload and retry.</li>
+          <li><b>Review</b> (owner and task manager): accept finished work, or send it back with a reason.</li>
+          <li><b>Field Walk</b>: the walking and scouting tasks due today. <b>Logs</b>: everything recorded.</li>
+        </ul>
 
         <div className="about-owner">
           <div className="about-owner-label">Owned by</div>

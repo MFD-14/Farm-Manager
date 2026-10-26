@@ -218,3 +218,25 @@ test("absence mode: skip auto-approves after 48h", async () => {
   const after = await getInstance(k01.id);
   assert.equal(after.state, "skipped");
 });
+
+test("notes: a farm note with a photo syncs without a task and lists for everyone", async () => {
+  const media_uuid = randomUUID();
+  const init = await api("/api/media/initiate", { method: "POST", token: caretakerToken,
+    body: { media_uuid, kind: "photo", bytes: 4, mime: "image/jpeg" } });
+  assert.equal(init.status, 200);
+  await api(`/api/media/${media_uuid}`, { method: "PATCH", token: caretakerToken, raw: true, body: Buffer.from([1, 2, 3, 4]),
+    headers: { "Upload-Offset": "0", "Content-Type": "application/offset+octet-stream" } });
+  assert.equal((await api(`/api/media/${media_uuid}/complete`, { method: "POST", token: caretakerToken })).status, 200);
+
+  const event_uuid = randomUUID();
+  const s = await api("/api/sync/events", { method: "POST", token: caretakerToken,
+    body: { events: [{ event_uuid, instance_id: null, type: "field_recorded",
+      payload: { note: "Fence down by the pool", media: [media_uuid] }, device_time: new Date().toISOString() }] } });
+  assert.deepEqual(s.json.accepted, [event_uuid]);
+
+  const r = await api("/api/sync/notes", { token: ownerToken });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.notes[0].note, "Fence down by the pool");
+  assert.equal(r.json.notes[0].by, "Caretaker");
+  assert.equal(r.json.notes[0].media[0].media_uuid, media_uuid);
+});

@@ -79,6 +79,19 @@ syncRouter.post("/events", auth(), async (req, res) => {
   });
 });
 
+// GET /api/sync/notes — farm notes: observations not tied to a task, sent
+// through the outbox as farm-level field_recorded events with their media.
+syncRouter.get("/notes", auth(), async (req, res) => {
+  const r = await q(
+    `SELECT e.event_uuid, e.payload->>'note' AS note, e.device_time, e.server_time, u.name AS by,
+       COALESCE((SELECT json_agg(json_build_object('media_uuid', m.media_uuid, 'kind', m.kind, 'status', m.status))
+                 FROM media_objects m WHERE m.media_uuid::text IN (SELECT jsonb_array_elements_text(e.payload->'media'))), '[]') AS media
+     FROM task_events e LEFT JOIN users u ON u.id = e.actor_id
+     WHERE e.instance_id IS NULL AND e.type = 'field_recorded' AND e.payload ? 'note'
+     ORDER BY e.server_time DESC LIMIT 100`);
+  res.json({ notes: r.rows });
+});
+
 // GET /api/sync/bundle — the whole next-day pack in one cacheable response (R20).
 syncRouter.get("/bundle", auth(), async (req, res) => {
   const dateStr = req.query.date || farmDateStr();
@@ -102,7 +115,7 @@ syncRouter.get("/bundle", auth(), async (req, res) => {
   const templates = await q(`SELECT * FROM task_templates WHERE active`);
   const reference = {
     assets: (await q(`SELECT id, code, name, kind, criticality FROM assets WHERE status = 'active'`)).rows,
-    locations: (await q(`SELECT id, code, name, kind, crop, plant_count FROM locations`)).rows,
+    locations: (await q(`SELECT id, code, name, kind, crop, plant_count, status FROM locations`)).rows,
     batches: (await q(`SELECT id, name, placed_on, current_count, stage FROM batches`)).rows,
     inventory: (await q(`SELECT id, name, unit, category, on_hand, reorder_point FROM inventory_items`)).rows,
   };

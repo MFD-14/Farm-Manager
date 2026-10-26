@@ -31,14 +31,14 @@ function useMediaUrl(mediaUuid, { cache = true } = {}) {
   return { src, failed };
 }
 
-function EvidencePhoto({ mediaUuid, onOpen }) {
+export function EvidencePhoto({ mediaUuid, onOpen }) {
   const { src, failed } = useMediaUrl(mediaUuid);
   if (failed) return <div className="ev-missing">Photo shows when online</div>;
   if (!src) return <div className="ev-missing">Loading…</div>;
   return <img className="ev-photo" src={src} alt="Evidence" onClick={() => onOpen?.(src)} />;
 }
 
-function EvidencePlayer({ mediaUuid, kind }) {
+export function EvidencePlayer({ mediaUuid, kind }) {
   const [open, setOpen] = useState(false);
   if (!open) {
     return (

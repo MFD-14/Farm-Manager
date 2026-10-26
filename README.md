@@ -20,7 +20,7 @@ installer in [DEPLOY-FREE-CLOUD.md](DEPLOY-FREE-CLOUD.md).
 
 **WhatsApp reminders:** set up in the app; keys and steps in
 [WHATSAPP-SETUP.md](WHATSAPP-SETUP.md). Evidence photos are accepted by an
-owner or task manager in the Review tab (no machine checking).
+owner or task manager in the Review screen (no machine checking).
 
 **Phones:** see [INSTALL-PHONES.md](INSTALL-PHONES.md). Android APK:
 <https://github.com/MFD-14/Farm-Manager/releases/download/android-latest/woodlands.apk>
@@ -91,7 +91,7 @@ from the forecast feed, rain from the W-08 gauge, applied volumes from
 completed W-03 shifts). When the projected deficit crosses management-allowed
 depletion the planner emits a refill shift with run time = depth / (rate ×
 efficiency), capped at 180 minutes with the remainder carrying forward. Ships
-disabled ("log before you automate"): the owner Water tab shows the ledger
+disabled ("log before you automate"): the owner Water screen shows the ledger
 running in shadow next to the Phase 1 tank-budget shifts and flips Phase 2 on
 with one tap; caretaker shift cards then explain the deficit they replace.
 Per-block agronomy (Kc, TAW, MAD, area, emitter rate, efficiency) is owner
