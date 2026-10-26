@@ -2,6 +2,7 @@
 // readings, inventory_moves, meter accumulators and batch counts are projections
 // updated deterministically from events. rebuildProjections replays the log.
 
+import { applyOutline } from "./fields.js";
 import { applyTransition, isTerminal } from "./stateMachine.js";
 import { validateEvidence } from "./evidence.js";
 import { routeAfterDoneReported } from "./verification.js";
@@ -193,6 +194,7 @@ export async function foldEvent(c, event, { skipSideEffects = false, replay = fa
        event.device_time || null, event.server_time || null, event.device_id || null]);
   }
 
+  if (!event.instance_id && event.payload?.outline) await applyOutline(c, event);
   if (!instance || conflict) return { status: "accepted", conflict };
 
   // Evidence summary maintenance

@@ -27,12 +27,11 @@ export function createApp() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "blob:"],
+        imgSrc: ["'self'", "data:", "blob:", "https://server.arcgisonline.com"], // Farm Map satellite tiles
         connectSrc: ["'self'"],
         workerSrc: ["'self'"],
         fontSrc: ["'self'", "data:"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        frameSrc: ["https://maps.google.com", "https://www.google.com"], // Farm Map satellite view
       },
     },
     // The phone shells load the app from the device (capacitor://localhost,

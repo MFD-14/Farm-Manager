@@ -1,17 +1,18 @@
-// Farm Map: satellite view (with signal), then the farm at a glance: water system with
+// Farm Map: field outlines on satellite imagery, then the farm at a glance: water system with
 // buffer autonomy, livestock and flocks, and the block layout. Cached for
 // offline viewing like every other reference screen.
 import React, { useEffect, useState } from "react";
 import { apiJson } from "../lib/api.js";
 import { metaGet, metaSet } from "../lib/db.js";
 import PlanSection from "../components/PlanSection.jsx";
+import FieldsSection from "../components/FieldsSection.jsx";
 
 const STATUS_CHIP = { active: "state-verified_closed", planted: "P2", fallow: "P3", planned: "state-released", reserve: "P3",
   "to clear": "state-released", lost: "P1" };
 const STATUS_LABEL = { active: "in use" };
 const SPECIES_LABEL = { cattle: "Cattle", goats: "Goats", pigs: "Pigs" };
 
-export default function FarmView() {
+export default function FarmView({ isConsole }) {
   const [data, setData] = useState(null);
   const [stale, setStale] = useState(false);
 
@@ -36,10 +37,7 @@ export default function FarmView() {
       <div className="daytitle">{farm.name}</div>
       <p className="farm-sub">{farm.subdivision} · {farm.location}</p>
       {stale && <p className="evidence-note" style={{ marginBottom: 8 }}>Offline — showing last synced data</p>}
-      {navigator.onLine && farm.coordinates && (
-        <iframe className="farm-map" title="Satellite map of the farm" loading="lazy"
-          src={`https://maps.google.com/maps?q=${farm.coordinates.lat},${farm.coordinates.lng}&t=k&z=15&output=embed`} />
-      )}
+      <FieldsSection isConsole={isConsole} center={farm.coordinates} />
 
       <div className="stat-row">
         <div className="stat"><div className="v">{farm.total_ha}</div><div className="l">hectares</div></div>

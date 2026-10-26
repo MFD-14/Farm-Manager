@@ -49,6 +49,8 @@
 	<string>Take evidence photos and videos for farm tasks, such as the tank gauge or a harvest count.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Attach an existing photo to a farm task.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Walk the edge of a bed or field to record its outline on the farm map.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Record sound with evidence videos and voice notes for problem reports.</string>
 	<key>UILaunchStoryboardName</key>

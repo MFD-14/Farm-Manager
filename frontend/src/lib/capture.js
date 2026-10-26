@@ -73,6 +73,12 @@ export async function clockInOut(direction) {
   await append(null, "field_recorded", { clock: direction });
 }
 
+// A field outline from a Google Earth import or a walked boundary. Owners and
+// task managers set it; a caretaker's walk waits for one of them to use it.
+export async function saveOutline(outline) {
+  await append(null, "field_recorded", { outline });
+}
+
 export async function requestSkip(instance, reasonCode, note) {
   await append(instance.id, "skip_requested", { reason_code: reasonCode, note: note || null });
   return patchInstance(instance.id, { state: "skip_pending" });

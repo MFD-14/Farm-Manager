@@ -115,6 +115,25 @@ ordered day view with the unsynced counter, sub-minute capture sheets, photo
 compression toward the 150–250 KB budget, owner digest / decision queue (claim
 and machine verdict side by side) / KPI board.
 
+## Mapping fields (Google Earth, then walk the boundary)
+
+1. In **Google Earth Pro** (free, desktop) find the farm, use **Add Polygon** to
+   trace each bed or field, and name it as it is in the app (for example
+   "Homestead garden: kale and rape beds"). Put them in one folder and use
+   **Save Place As… → KML** (not KMZ).
+2. In the app: **Farm Map → Import from Google Earth** (owners and task
+   managers). Each outline is matched to a field by name; pick another or
+   "New bed" if needed. Hectares are worked out from the outline.
+3. To refine an outline on the ground: **Walk a boundary** (Farm Map or Field
+   Walk). Press Start on a corner, walk the edge, press Finish at the start.
+   Points are kept when GPS is accurate to 20 m and 3 m apart; it works with
+   no signal and syncs later. An owner's or task manager's walk replaces the
+   outline; a caretaker's walk shows dashed gold until an owner or task
+   manager taps **Use walked outline** or **Discard**.
+
+Satellite imagery is Esri World Imagery (needs signal); outlines show offline.
+Set `FARM_LAT` / `FARM_LNG` in the server's `.env` so the map opens on the farm.
+
 ## Running it
 
 Requirements: Node 20+, PostgreSQL 14+. Redis is optional (the scheduler runs

@@ -23,7 +23,7 @@ function fmtTime(d) {
 // codes narrows the list (Field Walk: the walking and scouting tasks).
 // The + button adds a note (everyone) or releases a task that has no
 // schedule of its own (owners and task managers: projects, purchases, repairs).
-export default function DayView({ onCountsChanged, codes, title, onAddNote, canAddTask }) {
+export default function DayView({ onCountsChanged, codes, title, onAddNote, canAddTask, children }) {
   const [adding, setAdding] = useState(false);
   const [templates, setTemplates] = useState(null);
   const [addMsg, setAddMsg] = useState(null);
@@ -79,6 +79,7 @@ export default function DayView({ onCountsChanged, codes, title, onAddNote, canA
   return (
     <div className="wrap">
       <div className="daytitle">{title || today}</div>
+      {children}
       {windows.map((w, i) => (
         <div className="withhold-banner" key={i}>
           <b>{w.type === "phi" ? "Pre-harvest interval" : "Withdrawal"} active</b> · {w.subject_name}

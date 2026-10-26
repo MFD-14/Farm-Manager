@@ -17,6 +17,7 @@ import PeopleSheet from "./components/PeopleSheet.jsx";
 import ConnectionsSheet from "./components/ConnectionsSheet.jsx";
 import SyncSheet from "./components/SyncSheet.jsx";
 import ClockCard from "./components/ClockCard.jsx";
+import { WalkButton } from "./components/FieldsSection.jsx";
 
 import Login from "./views/Login.jsx";
 
@@ -204,7 +205,7 @@ export default function App() {
     review: () => <OwnerView tab="decisions" />,
     notes: () => <NotesView onCountsChanged={refreshCounts} />,
     sales: () => <SalesView onCountsChanged={refreshCounts} showRevenue={isConsole} />,
-    farm: () => <FarmView />,
+    farm: () => <FarmView isConsole={isConsole} />,
     crop: () => <CropPlanView mode="crop" />,
     cropmap: () => <CropPlanView mode="map" />,
     attendance: () => (
@@ -212,7 +213,7 @@ export default function App() {
         <ClockCard user={user} onCountsChanged={refreshCounts} />
       </LogsView>
     ),
-    walk: () => <DayView onCountsChanged={refreshCounts} codes={WALK} title="Field Walk" />,
+    walk: () => <DayView onCountsChanged={refreshCounts} codes={WALK} title="Field Walk"><WalkButton isConsole={isConsole} /></DayView>,
     logs: () => <LogsView />,
     rain: () => <RainView onCaptureToday={isConsole ? undefined : () => setTab("tasks")} />,
     water: () => <WaterView />,

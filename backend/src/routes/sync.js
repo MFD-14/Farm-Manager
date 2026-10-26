@@ -117,7 +117,7 @@ syncRouter.get("/bundle", auth(), async (req, res) => {
   const templates = await q(`SELECT * FROM task_templates WHERE active`);
   const reference = {
     assets: (await q(`SELECT id, code, name, kind, criticality FROM assets WHERE status = 'active'`)).rows,
-    locations: (await q(`SELECT id, code, name, kind, crop, plant_count, status FROM locations`)).rows,
+    locations: (await q(`SELECT id, code, name, kind, crop, plant_count, status, geom, geom_meta, geom_proposed FROM locations`)).rows,
     batches: (await q(`SELECT id, name, placed_on, current_count, stage FROM batches`)).rows,
     inventory: (await q(`SELECT id, name, unit, category, on_hand, reorder_point FROM inventory_items`)).rows,
   };
