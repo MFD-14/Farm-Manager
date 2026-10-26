@@ -131,8 +131,11 @@ and machine verdict side by side) / KPI board.
    outline; a caretaker's walk shows dashed gold until an owner or task
    manager taps **Use walked outline** or **Discard**.
 
+Name the title-deed outline "Farm boundary" (the beacon KML does) and it is
+kept as the farm's boundary: a red line, not counted again as land, and the
+map centres on it. Points (beacons, the dam) are not imported.
+
 Satellite imagery is Esri World Imagery (needs signal); outlines show offline.
-Set `FARM_LAT` / `FARM_LNG` in the server's `.env` so the map opens on the farm.
 
 ## Running it
 

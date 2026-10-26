@@ -169,6 +169,17 @@ ownerRouter.get("/rain", auth(), async (req, res) => {
 
 // Farm profile: land, livestock, flocks and the water system in one response,
 // with the derived figures an owner reasons from (buffer autonomy, cropped area).
+// Map centre: the middle of the imported farm boundary when there is one,
+// else FARM_LAT / FARM_LNG (default Kwekwe).
+async function farmCentre() {
+  const ring = (await q(`SELECT geom FROM locations WHERE code = 'FARM-BOUNDARY'`)).rows[0]?.geom?.coordinates?.[0];
+  if (ring?.length > 3) {
+    const pts = ring.slice(0, -1);
+    return { lat: pts.reduce((a, p) => a + p[1], 0) / pts.length, lng: pts.reduce((a, p) => a + p[0], 0) / pts.length };
+  }
+  return { lat: Number(process.env.FARM_LAT || -18.9281), lng: Number(process.env.FARM_LNG || 29.8149) };
+}
+
 ownerRouter.get("/farm", auth(), async (req, res) => {
   const blocks = (await q(
     `SELECT code, name, kind, crop, plant_count, hectares, soil, status, irrigated
@@ -206,7 +217,7 @@ ownerRouter.get("/farm", auth(), async (req, res) => {
       location: "Kwekwe, Midlands Province, Zimbabwe",
       total_ha: 119.2, mapped_ha: Math.round(mapped * 10) / 10,
       cropped_ha: Math.round(cropped * 10) / 10,
-      coordinates: { lat: Number(process.env.FARM_LAT || -18.9281), lng: Number(process.env.FARM_LNG || 29.8149) },
+      coordinates: await farmCentre(),
     },
     blocks,
     livestock: {

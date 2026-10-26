@@ -156,6 +156,9 @@ export const LOCATIONS = [
   { code: "HOMESTEAD", name: "Homestead garden", kind: "zone", crop: "kale, rape, tomato Rodade, onion Texas Grano, sorghum SV4, maize (split to follow)", irrigated: true, hectares: 2, soil: "Composted loam", status: "active" },
   { code: "UNCLEARED", name: "Land to clear (grazing meanwhile)", kind: "paddock", hectares: 112.2, soil: "Mixed", status: "to clear" },
   { code: "MINING", name: "Lost to mining activity", kind: "zone", hectares: 5, status: "lost" },
+  // The title-deed boundary as an outline only (no hectares, so it isn't
+  // counted again in the land list); imported from the beacon KML.
+  { code: "FARM-BOUNDARY", name: "Farm boundary", kind: "zone", status: "active" },
   // Beds inside the homestead garden. They keep their codes because tasks
   // (C-01 kale harvest, C-05 scouting) and the irrigation planner refer to them;
   // their area is part of the homestead's 2 ha.

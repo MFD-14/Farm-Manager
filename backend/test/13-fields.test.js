@@ -79,3 +79,13 @@ test("outlines: a new bed named in Google Earth is created for owners only; bad 
   await outline(owner, { location_id: bed.id, coordinates: [[LNG, LAT], [LNG, LAT]] });
   assert.equal((await loc("BLK-B")).geom, null);
 });
+
+test("farm boundary: an outline only (not counted as land), and the map centres on it", async () => {
+  const farm = async () => (await api("/api/owner/farm", { token: owner })).json;
+  const before = await farm();
+  assert.ok(!before.blocks.some((b) => b.code === "FARM-BOUNDARY"), "no hectares, so not in the land list");
+  const fb = await loc("FARM-BOUNDARY");
+  await outline(owner, { location_id: fb.id, coordinates: SQUARE, source: "google_earth" });
+  const c = (await farm()).farm.coordinates;
+  assert.ok(Math.abs(c.lat - (LAT + dLat / 2)) < 1e-9 && Math.abs(c.lng - (LNG + dLng / 2)) < 1e-9);
+});

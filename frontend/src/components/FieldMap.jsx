@@ -27,11 +27,13 @@ export default function FieldMap({ locations = [], center = FARM_CENTER, track, 
     const g = layer.current;
     g.clearLayers();
     const bounds = [];
-    for (const l of locations) {
+    // The farm boundary first, as a red line with no fill, so beds draw on top.
+    const boundaryFirst = [...locations].sort((a, b) => (b.code === "FARM-BOUNDARY") - (a.code === "FARM-BOUNDARY"));
+    for (const l of boundaryFirst) {
       if (l.geom) {
-        const poly = L.polygon(latlngs(l.geom.coordinates[0]), {
-          color: l.id === selected ? "#e0be5f" : "#45b868", weight: l.id === selected ? 4 : 2, fillOpacity: 0.15,
-        }).bindTooltip(l.name, { sticky: true }).on("click", () => onSelect?.(l));
+        const poly = L.polygon(latlngs(l.geom.coordinates[0]), l.code === "FARM-BOUNDARY"
+          ? { color: l.id === selected ? "#e0be5f" : "#c0392b", weight: 3, fill: false }
+          : { color: l.id === selected ? "#e0be5f" : "#45b868", weight: l.id === selected ? 4 : 2, fillOpacity: 0.15 }).bindTooltip(l.name, { sticky: true }).on("click", () => onSelect?.(l));
         g.addLayer(poly);
         bounds.push(...poly.getLatLngs()[0]);
       }
