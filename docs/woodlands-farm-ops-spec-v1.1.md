@@ -762,8 +762,9 @@ POST /api/sync/events
   Rules: idempotent on event_uuid; actor_type set from the account's role; caretakers may send only
   field events (3.2), others are rejected with reason "not allowed for your role"; illegal transitions
   are rejected per event, never the batch.
-GET  /api/sync/notes  -> { notes: [{ event_uuid, note, device_time, server_time, by, media: [{ media_uuid, kind, status }] }] }
-                         (farm notes: field_recorded events with instance_id null and payload { note, media: [uuid] };
+GET  /api/sync/notes[?kind=clock]  -> { notes: [{ event_uuid, note, device_time, server_time, by, media: [{ media_uuid, kind, status }] }] }
+                         (farm notes, or clock-ins and outs with kind=clock: field_recorded events with instance_id null and payload
+                          { note, media: [uuid] } or { clock: in|out };
                           written through POST /api/sync/events and media initiate without an instance)
 GET  /api/sync/bundle?date=  -> { date, plan: {...instances}, open_instances, templates_delta,
                                   reference_delta: { assets, locations, batches, inventory },
@@ -952,7 +953,7 @@ Status: **Built** (in this repository, tested), **Partial** (built with a named 
 | Photos not checked by Claude; uploaded and logged with the task; admin or task manager accepts | Built | 5.6; Claude integration removed |
 | Task manager role | Built | 3.2, 6.2, 9.1 |
 | Caretaker self sign-up, owner approval | Built | 6.2 |
-| App menu in the Tend layout: Dashboard, Tasks, Review, Notes, Farm Map, Crop Plan by Crop and by Map, Time & Attendance, Field Walk, Logs, Rain, Water, KPIs, Settings, Help | Built | Side menu; Notes (offline, with photos, video, voice), crop plan from the cached bundle, Time & Attendance from F-02 records, Field Walk as the day's walking and scouting tasks |
+| App menu in the Tend layout: Dashboard, Tasks, Review, Notes, Farm Map, Crop Plan by Crop and by Map, Time & Attendance, Field Walk, Logs, Rain, Water, KPIs, Settings, Help | Built | Side menu; Notes (offline, with photos, video, voice), crop plan from the cached bundle, Time & Attendance with offline clock in and out plus the F-02 sheets, a header bell (decisions waiting, or overdue tasks for a caretaker) and globe (English or Shona menu; Shona to be checked by a speaker), Field Walk as the day's walking and scouting tasks |
 | WhatsApp reminders, morning list, sent-back notices, owner alerts | Built (needs Meta credentials) | 4.4 |
 | Water: borehole 6,000 L/h, main tank 80,000 to 125,000 L, pool 45,000 L | Built | `water_params`; T1, T5; irrigation planner |
 | Phase 0 tank rehabilitation, measured usable volume | Built | A-P1 to A-P4; milestone; A-05 baseline |

@@ -79,16 +79,18 @@ syncRouter.post("/events", auth(), async (req, res) => {
   });
 });
 
-// GET /api/sync/notes — farm notes: observations not tied to a task, sent
-// through the outbox as farm-level field_recorded events with their media.
+// GET /api/sync/notes[?kind=clock] — farm-level entries not tied to a task,
+// sent through the outbox as field_recorded events: notes (with media) or
+// clock-ins and clock-outs for Time & Attendance.
 syncRouter.get("/notes", auth(), async (req, res) => {
+  const key = req.query.kind === "clock" ? "clock" : "note";
   const r = await q(
-    `SELECT e.event_uuid, e.payload->>'note' AS note, e.device_time, e.server_time, u.name AS by,
+    `SELECT e.event_uuid, e.payload->>$1 AS ${key}, e.device_time, e.server_time, u.name AS by,
        COALESCE((SELECT json_agg(json_build_object('media_uuid', m.media_uuid, 'kind', m.kind, 'status', m.status))
                  FROM media_objects m WHERE m.media_uuid::text IN (SELECT jsonb_array_elements_text(e.payload->'media'))), '[]') AS media
      FROM task_events e LEFT JOIN users u ON u.id = e.actor_id
-     WHERE e.instance_id IS NULL AND e.type = 'field_recorded' AND e.payload ? 'note'
-     ORDER BY e.server_time DESC LIMIT 100`);
+     WHERE e.instance_id IS NULL AND e.type = 'field_recorded' AND e.payload ? $1
+     ORDER BY e.server_time DESC LIMIT 100`, [key]);
   res.json({ notes: r.rows });
 });
 

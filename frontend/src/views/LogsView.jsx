@@ -1,6 +1,7 @@
 // Logs: what has been recorded on the farm, newest first, with the readings
 // each record carries. Time & Attendance is the same list narrowed to the
-// weekly attendance and wage sheet (F-02). Cached for offline reading.
+// weekly attendance and wage sheet (F-02), under the clock in and out card.
+// Cached for offline reading.
 import React, { useEffect, useState } from "react";
 import { apiJson } from "../lib/api.js";
 import { metaGet, metaSet } from "../lib/db.js";
@@ -10,7 +11,7 @@ const STATE_LABEL = { done_reported: "reported", needs_review: "awaiting accepta
   skipped: "skipped", missed: "missed" };
 const label = (k) => k.replace(/_/g, " ");
 
-export default function LogsView({ codes, title = "Logs", empty = "Nothing recorded yet." }) {
+export default function LogsView({ codes, title = "Logs", empty = "Nothing recorded yet.", children }) {
   const [rows, setRows] = useState(null);
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export default function LogsView({ codes, title = "Logs", empty = "Nothing recor
   return (
     <div className="wrap">
       <div className="daytitle">{title}</div>
+      {children}
       {!rows && <div className="empty">Loading…</div>}
       {rows && !list.length && <div className="empty">{empty}</div>}
       {list.map((i) => {

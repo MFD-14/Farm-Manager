@@ -240,3 +240,14 @@ test("notes: a farm note with a photo syncs without a task and lists for everyon
   assert.equal(r.json.notes[0].by, "Caretaker");
   assert.equal(r.json.notes[0].media[0].media_uuid, media_uuid);
 });
+
+test("clock in and out: farm-level entries listed separately from notes", async () => {
+  const ev = (clock) => ({ event_uuid: randomUUID(), instance_id: null, type: "field_recorded", payload: { clock },
+    device_time: new Date().toISOString() });
+  const s = await api("/api/sync/events", { method: "POST", token: caretakerToken, body: { events: [ev("in"), ev("out")] } });
+  assert.equal(s.json.accepted.length, 2);
+  const r = await api("/api/sync/notes?kind=clock", { token: ownerToken });
+  assert.deepEqual(r.json.notes.map((n) => n.clock).sort(), ["in", "out"]);
+  assert.ok(r.json.notes.every((n) => n.by === "Caretaker"));
+  assert.equal((await api("/api/sync/notes", { token: ownerToken })).json.notes.filter((n) => !n.note).length, 0);
+});

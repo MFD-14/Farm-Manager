@@ -68,6 +68,11 @@ export async function saveNote(note, mediaItems) {
   await append(null, "field_recorded", { note, media: mediaItems.map((m) => m.media_uuid) });
 }
 
+// Time & Attendance: a clock-in or clock-out, offline like everything else.
+export async function clockInOut(direction) {
+  await append(null, "field_recorded", { clock: direction });
+}
+
 export async function requestSkip(instance, reasonCode, note) {
   await append(instance.id, "skip_requested", { reason_code: reasonCode, note: note || null });
   return patchInstance(instance.id, { state: "skip_pending" });
