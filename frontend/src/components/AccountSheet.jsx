@@ -4,6 +4,7 @@
 import React, { useState } from "react";
 import { apiJson, setToken, errorMessage } from "../lib/api.js";
 import { metaSet } from "../lib/db.js";
+import SheetClose from "./SheetClose.jsx";
 
 export function PasswordForm({ onDone, forced, initialCurrent = "" }) {
   const [current, setCurrent] = useState(initialCurrent);
@@ -94,6 +95,7 @@ export default function AccountSheet({ user, pending, waiting = 0, onClose, onUs
   return (
     <div className="sheet" onClick={onClose}>
       <div className="panel" onClick={(e) => e.stopPropagation()}>
+        <SheetClose onClose={onClose} />
         <h2>My account</h2>
         <div className="code">{user.role === "owner" ? "Owner · full admin access"
           : user.role === "manager" ? "Task manager · accepts completed tasks" : "Caretaker"}</div>

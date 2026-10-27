@@ -5,9 +5,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { reportDone, requestSkip, flagProblem, evidenceReady, attachToTask, SKIP_REASONS } from "../lib/capture.js";
 import Attachments from "./Attachments.jsx";
+import SheetClose from "./SheetClose.jsx";
 import { metaGet } from "../lib/db.js";
 
-export default function CaptureSheet({ instance, onClose }) {
+export default function CaptureSheet({ instance, onClose, showCodes }) {
   const policy = useMemo(
     () => instance.params?.evidence_policy_resolved || instance.template_evidence_policy || { classes: ["E0"] },
     [instance]);
@@ -72,14 +73,29 @@ export default function CaptureSheet({ instance, onClose }) {
   const needsVoice = policy.classes?.includes("E5");
   const photoMin = policy.photo_min ?? (policy.classes?.includes("E3") ? 2 : needsPhoto ? 1 : 0);
 
+  // What still stands between the person and Done, in plain words.
+  const missing = [
+    photos < photoMin && `add ${photoMin - photos} photo${photoMin - photos > 1 ? "s" : ""}`,
+    needsVideo && !videos && "add a video",
+    needsVoice && !voices && "add a voice note",
+  ].filter(Boolean).join(", ") || "fill in the numbers";
+  // − / + start from the last recorded value when the field is empty.
+  const step = (f, d) => {
+    const cur = fields[f.key] !== undefined && fields[f.key] !== "" ? Number(fields[f.key]) : Number(lastValues?.fields?.[f.key] ?? 0);
+    setFields({ ...fields, [f.key]: String(Math.max(0, (Number.isNaN(cur) ? 0 : cur) + d)) });
+  };
+
   return (
     <div className="sheet" onClick={onClose}>
       <div className="panel" onClick={(e) => e.stopPropagation()}>
+        <SheetClose onClose={onClose} />
         <h2>{instance.title}</h2>
-        <div className="code">
-          {instance.template_code} · {instance.priority}
-          {instance.params?.litres ? ` · ${instance.params.minutes} min · ${instance.params.litres} L` : ""}
-        </div>
+        {(showCodes || instance.params?.litres) && (
+          <div className="code">
+            {showCodes && `${instance.template_code} · ${instance.priority}`}
+            {instance.params?.litres ? `${showCodes ? " · " : ""}${instance.params.minutes} min · ${instance.params.litres} L` : ""}
+          </div>
+        )}
 
         {instance.params?.basis?.method === "water_balance" && (
           <div className="instructions">
@@ -147,13 +163,17 @@ export default function CaptureSheet({ instance, onClose }) {
                     <option value="">—</option>
                     {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
+                ) : f.type === "number" ? (
+                  // Big − / + for gloved hands; the last value is the starting hint.
+                  <div className="stepper">
+                    <button type="button" aria-label={`Less ${f.label || f.key}`} onClick={() => step(f, -1)}>−</button>
+                    <input type="number" inputMode="decimal" value={fields[f.key] ?? ""}
+                      placeholder={lastValues?.fields?.[f.key] !== undefined ? `last: ${lastValues.fields[f.key]}` : f.unit || ""}
+                      onChange={(e) => setFields({ ...fields, [f.key]: e.target.value })} />
+                    <button type="button" aria-label={`More ${f.label || f.key}`} onClick={() => step(f, 1)}>+</button>
+                  </div>
                 ) : (
-                  <input
-                    type={f.type === "number" ? "number" : "text"}
-                    inputMode={f.type === "number" ? "decimal" : "text"}
-                    value={fields[f.key] ?? ""}
-                    onChange={(e) => setFields({ ...fields, [f.key]: e.target.value })}
-                  />
+                  <input type="text" value={fields[f.key] ?? ""} onChange={(e) => setFields({ ...fields, [f.key]: e.target.value })} />
                 )}
               </div>
             ))}
@@ -171,9 +191,8 @@ export default function CaptureSheet({ instance, onClose }) {
             </div>
 
             <button className="btn primary block" disabled={!ready || busy} onClick={submitDone}>
-              {busy ? "Saving…" : "Done"}
+              {busy ? "Saving…" : ready ? "Done" : `To finish: ${missing}`}
             </button>
-            {!ready && <p className="evidence-note">Fill the required evidence to enable Done.</p>}
 
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <button className="btn warn" style={{ flex: 1 }} onClick={() => setMode("skip")}>Skip…</button>

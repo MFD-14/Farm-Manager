@@ -8,6 +8,7 @@ import { metaGet } from "../lib/db.js";
 import { pullBundle } from "../lib/sync.js";
 import { saveOutline } from "../lib/capture.js";
 import { parseKml, ringAreaHa, fmtHa } from "../lib/geo.js";
+import SheetClose from "./SheetClose.jsx";
 
 const SOURCE = { google_earth: "Google Earth", gps_walk: "walked" };
 const walkable = (l) => ["block", "zone", "paddock"].includes(l.kind) && l.status !== "retired";
@@ -72,8 +73,11 @@ export default function FieldsSection({ isConsole, center }) {
   return (
     <>
       <div className="section-title">Fields · {mapped.length} of {fields.length} outlined</div>
-      <FieldMap locations={fields} center={center} selected={sel} onSelect={(l) => setSel(l.id)} />
-      {!navigator.onLine && <p className="evidence-note">Satellite imagery needs signal; outlines show offline.</p>}
+      <FieldMap locations={fields} center={center} selected={sel} onSelect={(l) => setSel(l.id)}
+        emptyText={mapped.length ? null : isConsole ? "No outlines yet. Import the farm boundary from Google Earth, or walk a boundary." : "No outlines yet. Walk a boundary to draw the first one."}>
+        <button type="button" className="btn primary map-fab" onClick={() => setWalk("")}>Walk a boundary</button>
+      </FieldMap>
+      {!navigator.onLine && <p className="evidence-note">The satellite photo needs signal; outlines show offline.</p>}
       {msg && <p className="form-msg good">{msg}</p>}
       {field && (
         <div className="card">
@@ -101,8 +105,7 @@ export default function FieldsSection({ isConsole, center }) {
         </div>
       )}
       <div className="person-actions">
-        <button type="button" className="btn ghost" onClick={() => setWalk("")}>Walk a boundary</button>
-        {isConsole && <label className="btn ghost">Import from Google Earth<input type="file" hidden onChange={onKml} /></label>}
+        {isConsole && <label className="link-toggle">Import outlines from Google Earth (KML)<input type="file" hidden onChange={onKml} /></label>}
       </div>
 
       {walk !== null && <WalkBoundary fields={fields} initialId={walk} isConsole={isConsole} center={center}
@@ -111,6 +114,7 @@ export default function FieldsSection({ isConsole, center }) {
       {imported && (
         <div className="sheet" onClick={() => setImported(null)}>
           <div className="panel" onClick={(e) => e.stopPropagation()}>
+            <SheetClose onClose={() => setImported(null)} />
             <h2>Outlines from Google Earth</h2>
             <p className="evidence-note" style={{ textAlign: "left" }}>Choose which bed or field each outline is. Unmatched ones become new beds.</p>
             {imported.map((s, i) => (

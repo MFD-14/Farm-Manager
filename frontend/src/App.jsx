@@ -26,28 +26,29 @@ const LEAF_ICON = "M11 20A7 7 0 019.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5
 const WALK = ["A-02", "A-03", "W-05", "C-04", "C-05", "C-INSPECT", "W-ACCESS"];
 const ATTENDANCE = ["F-02"];
 
-// The side menu, in the order of the Tend reference; console entries are for
-// owners and task managers only. sn: the Shona label (globe button), to be
-// checked by a Shona speaker.
+// The side menu (Tend layout), shown in groups (GROUPS below); console entries
+// are for owners and task managers only. sn: the Shona label (globe button),
+// to be checked by a Shona speaker.
 const MENU = [
-  { key: "dashboard", sn: "Pfupiso", label: "Dashboard", console: true, icon: "M12 3a9 9 0 109 9h-9z" },
-  { key: "tasks", sn: "Mabasa", label: "Tasks", icon: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" },
-  { key: "review", sn: "Ongorora", label: "Review", console: true, icon: "M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" },
-  { key: "sales", sn: "Kutengesa", label: "Sales", icon: "M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" },
-  { key: "notes", sn: "Zvinyorwa", label: "Notes", icon: "M11 4H4v16h16v-7M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z" },
-  { key: "farm", sn: "Mepu yepurazi", label: "Farm Map", icon: "M1 6v16l7-4 8 4 7-4V2l-7 4-8-4zM8 2v16M16 6v16" },
-  { key: "crop", sn: "Zvirimwa nechirimwa", label: "Crop Plan By Crop", icon: LEAF_ICON },
-  { key: "cropmap", sn: "Zvirimwa nemepu", label: "Crop Plan By Map", icon: "M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11zM12 10h.01" },
-  { key: "livestock", sn: "Zvipfuyo", label: "Livestock", icon: "M4 10c0-3 2-5 5-5h6c3 0 5 2 5 5v4a4 4 0 01-4 4H8a4 4 0 01-4-4zM8 5V3M16 5V3M9 12h.01M15 12h.01" },
-  { key: "attendance", sn: "Nguva nekuuya kubasa", label: "Time & Attendance", icon: "M12 7v5l3 3M12 21a9 9 0 110-18 9 9 0 010 18z" },
-  { key: "walk", sn: "Kufamba mumunda", label: "Field Walk", icon: "M13 4h.01M7 21l3-6 3 2v4M10 15l1-6 4 3h3M11 9l-4 2v3" },
-  { key: "logs", sn: "Zvakanyorwa", label: "Logs", icon: "M3 3v18h18M7 16l4-8 4 4 4-6" },
-  { key: "rain", sn: "Mvura yakanaya", label: "Rain", icon: "M12 2.69l5.66 5.66a8 8 0 11-11.31 0z" },
-  { key: "water", sn: "Mvura", label: "Water", console: true, icon: "M2 12h4l3-9 4 18 3-9h6" },
-  { key: "kpis", sn: "Zviyero", label: "KPIs", console: true, icon: "M12 20V10M18 20V4M6 20v-4" },
+  { key: "dashboard", group: "today", sn: "Pfupiso", label: "Dashboard", console: true, icon: "M12 3a9 9 0 109 9h-9z" },
+  { key: "tasks", group: "today", sn: "Mabasa", label: "Tasks", icon: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" },
+  { key: "review", group: "today", sn: "Ongorora", label: "Review", console: true, icon: "M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" },
+  { key: "sales", group: "records", sn: "Kutengesa", label: "Sales", icon: "M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" },
+  { key: "notes", group: "records", sn: "Zvinyorwa", label: "Notes", icon: "M11 4H4v16h16v-7M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z" },
+  { key: "farm", group: "farm", sn: "Mepu yepurazi", label: "Farm Map", icon: "M1 6v16l7-4 8 4 7-4V2l-7 4-8-4zM8 2v16M16 6v16" },
+  { key: "crop", group: "farm", sn: "Zvirimwa nechirimwa", label: "Crop Plan By Crop", icon: LEAF_ICON },
+  { key: "cropmap", group: "farm", sn: "Zvirimwa nemepu", label: "Crop Plan By Map", icon: "M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11zM12 10h.01" },
+  { key: "livestock", group: "farm", sn: "Zvipfuyo", label: "Livestock", icon: "M4 10c0-3 2-5 5-5h6c3 0 5 2 5 5v4a4 4 0 01-4 4H8a4 4 0 01-4-4zM8 5V3M16 5V3M9 12h.01M15 12h.01" },
+  { key: "attendance", group: "records", sn: "Nguva nekuuya kubasa", label: "Time & Attendance", icon: "M12 7v5l3 3M12 21a9 9 0 110-18 9 9 0 010 18z" },
+  { key: "walk", group: "farm", sn: "Kufamba mumunda", label: "Field Walk", icon: "M13 4h.01M7 21l3-6 3 2v4M10 15l1-6 4 3h3M11 9l-4 2v3" },
+  { key: "logs", group: "records", sn: "Zvakanyorwa", label: "Logs", icon: "M3 3v18h18M7 16l4-8 4 4 4-6" },
+  { key: "rain", group: "farm", sn: "Mvura yakanaya", label: "Rain", icon: "M12 2.69l5.66 5.66a8 8 0 11-11.31 0z" },
+  { key: "water", group: "farm", sn: "Mvura", label: "Water", console: true, icon: "M2 12h4l3-9 4 18 3-9h6" },
+  { key: "kpis", group: "reports", sn: "Zviyero", label: "KPIs", console: true, icon: "M12 20V10M18 20V4M6 20v-4" },
 ];
 
-const SN = { Settings: "Zvirongwa", Help: "Rubatsiro" };
+const GROUPS = [["today", "Today", "Nhasi"], ["farm", "Farm", "Purazi"], ["records", "Records", "Marekodhi"], ["reports", "Reports", "Mishumo"]];
+const SN = { Account: "Akaundi", Sync: "Kuwirirana", Help: "Rubatsiro" };
 
 function Icon({ d, size = 20 }) {
   return (
@@ -64,9 +65,9 @@ export default function App() {
   const [syncing, setSyncing] = useState(false);
   const [tab, setTab] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [lang, setLang] = useState(() => { try { return localStorage.getItem("lang") || "en"; } catch { return "en"; } });
   const [alerts, setAlerts] = useState(0); // bell: work waiting on this person
+  const [badges, setBadges] = useState({}); // menu counts: review queue, tasks left today
   const [showAbout, setShowAbout] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const [showPeople, setShowPeople] = useState(false);
@@ -81,12 +82,15 @@ export default function App() {
   // Bell count. Owners and task managers: tasks waiting for a decision (plus
   // sign-ups for owners). Caretakers: open tasks already past due.
   const refreshAlerts = useCallback(async (role) => {
+    const open = (await getPlanInstances()).filter((i) => ["released", "acknowledged", "in_progress"].includes(i.state));
+    const late = open.filter((i) => i.due_at && new Date(i.due_at).getTime() < Date.now()).length;
     if (["owner", "admin", "manager"].includes(role)) {
-      try { setAlerts((await apiJson("/api/instances?state=decisions")).instances.length); } catch { /* offline */ }
+      try {
+        const review = (await apiJson("/api/instances?state=decisions")).instances.length;
+        setAlerts(review); setBadges({ review, tasks: open.length });
+      } catch { setBadges((b) => ({ ...b, tasks: open.length })); /* offline */ }
     } else {
-      const now = Date.now();
-      setAlerts((await getPlanInstances()).filter((i) => ["released", "acknowledged", "in_progress"].includes(i.state)
-        && i.due_at && new Date(i.due_at).getTime() < now).length);
+      setAlerts(late); setBadges({ tasks: open.length });
     }
   }, []);
   useEffect(() => {
@@ -203,7 +207,7 @@ export default function App() {
 
   const views = {
     dashboard: () => <OwnerView tab="day" />,
-    tasks: () => <DayView onCountsChanged={refreshCounts} onAddNote={() => setTab("notes")} canAddTask={isConsole} />,
+    tasks: () => <DayView onCountsChanged={refreshCounts} onAddNote={() => setTab("notes")} canAddTask={isConsole} showCodes={isConsole} />,
     review: () => <OwnerView tab="decisions" />,
     notes: () => <NotesView onCountsChanged={refreshCounts} />,
     sales: () => <SalesView onCountsChanged={refreshCounts} showRevenue={isConsole} />,
@@ -216,7 +220,7 @@ export default function App() {
         <ClockCard user={user} onCountsChanged={refreshCounts} />
       </LogsView>
     ),
-    walk: () => <DayView onCountsChanged={refreshCounts} codes={WALK} title="Field Walk"><WalkButton isConsole={isConsole} /></DayView>,
+    walk: () => <DayView onCountsChanged={refreshCounts} codes={WALK} title="Field Walk" showCodes={isConsole}><WalkButton isConsole={isConsole} /></DayView>,
     logs: () => <LogsView showCosts={isConsole} />,
     rain: () => <RainView onCaptureToday={isConsole ? undefined : () => setTab("tasks")} />,
     water: () => <WaterView />,
@@ -231,10 +235,7 @@ export default function App() {
             {isOwner && waiting > 0 && <span className="dot" aria-label={`${waiting} waiting for approval`} />}
             <Icon d="M3 6h18M3 12h18M3 18h18" size={18} />
           </button>
-          <div>
-            <div className="brand">Woodlands</div>
-            <div className="sub">{t(MENU.find((m) => m.key === page) || MENU[0])}</div>
-          </div>
+          <div className="brand">Woodlands</div>
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {!online && <span className="badge offline">offline</span>}
@@ -264,29 +265,31 @@ export default function App() {
               </button>
             </div>
             <div className="drawer-user">
-              <span className="avatar">{initials}</span>
-              <div><b>{user.name}</b><small>{user.email}</small></div>
+              <span className="avatar" aria-hidden="true">{initials}</span>
+              <div><b>{user.name}</b><small>{roleLabel} · Woodlands Farm</small></div>
             </div>
-            <div className="drawer-farm"><b>Woodlands Farm</b><small>{roleLabel}</small></div>
-            {menu.map((m) => (
-              <button key={m.key} type="button" className={`drawer-item ${page === m.key ? "on" : ""}`} onClick={() => go(m.key)}>
-                <Icon d={m.icon} />{t(m)}
-              </button>
-            ))}
-            <hr />
-            <button type="button" className="drawer-item group" onClick={() => setShowSettings(!showSettings)}>
-              {word("Settings")}<Icon d={showSettings ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"} />
-            </button>
-            {showSettings && (
-              <div className="drawer-sub">
-                <button type="button" onClick={() => openSheet(setShowAccount)}>My account</button>
-                {isOwner && <button type="button" onClick={() => openSheet(setShowPeople)}>
-                  People{waiting > 0 && <span className="chip role-pending">{waiting} waiting</span>}</button>}
-                {isOwner && <button type="button" onClick={() => openSheet(setShowConnections)}>WhatsApp</button>}
-                <button type="button" onClick={() => openSheet(setShowSync)}>Sync &amp; uploads</button>
-              </div>
-            )}
-            <button type="button" className="drawer-item group" onClick={() => openSheet(setShowAbout)}>{word("Help")}</button>
+            {/* Account (people and WhatsApp for owners), sync and help: always in view, not under the fold. */}
+            <div className="drawer-quick">
+              <button type="button" onClick={() => openSheet(setShowAccount)}>{word("Account")}{isOwner && waiting > 0 && <span className="dot" aria-label={`${waiting} waiting for approval`} />}</button>
+              <button type="button" onClick={() => openSheet(setShowSync)}>{word("Sync")}</button>
+              <button type="button" onClick={() => openSheet(setShowAbout)}>{word("Help")}</button>
+            </div>
+            {GROUPS.map(([g, label, sn]) => {
+              const items = menu.filter((m) => m.group === g);
+              if (!items.length) return null;
+              return (
+                <React.Fragment key={g}>
+                  <div className="drawer-group">{lang === "sn" ? sn : label}</div>
+                  {items.map((m) => (
+                    <button key={m.key} type="button" className={`drawer-item ${page === m.key ? "on" : ""}`} onClick={() => go(m.key)}
+                      aria-current={page === m.key ? "page" : undefined}>
+                      <Icon d={m.icon} />{t(m)}
+                      {badges[m.key] > 0 && <span className="badge-n" aria-label={`${badges[m.key]} waiting`}>{badges[m.key]}</span>}
+                    </button>
+                  ))}
+                </React.Fragment>
+              );
+            })}
           </nav>
         </div>
       )}

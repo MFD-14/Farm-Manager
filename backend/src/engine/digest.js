@@ -133,7 +133,17 @@ async function weekToDate(c) {
   }
   const total = (o) => Math.round(Object.values(o).reduce((a, b) => a + b, 0) * 10) / 10;
   const pair = (now, before) => ({ now, before });
+  // Last 7 farm days, oldest first, for the dashboard's small trend lines.
+  const daily = async (metric) => {
+    const r = await c.query(
+      `SELECT to_char(d, 'YYYY-MM-DD') AS day, COALESCE(SUM(r.value), 0) AS v
+       FROM generate_series((now() AT TIME ZONE 'Africa/Harare')::date - 6, (now() AT TIME ZONE 'Africa/Harare')::date, '1 day') d
+       LEFT JOIN readings r ON r.metric = $1 AND (r.taken_at AT TIME ZONE 'Africa/Harare')::date = d
+       GROUP BY d ORDER BY d`, [metric]);
+    return r.rows.map((x) => Number(x.v));
+  };
   return {
+    daily: { revenue_usd: await daily("sales_usd"), bundles_harvested: await daily("bundle_count") },
     revenue_usd: pair(await sum("sales_usd", 7, 0), await sum("sales_usd", 14, 7)),
     bundles_harvested: pair(await sum("bundle_count", 7, 0), await sum("bundle_count", 14, 7)),
     plantings: pair(await plantings(7, 0), await plantings(14, 7)),

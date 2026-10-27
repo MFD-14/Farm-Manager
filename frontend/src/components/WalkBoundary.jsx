@@ -7,6 +7,7 @@ import React, { useEffect, useRef, useState } from "react";
 import FieldMap from "./FieldMap.jsx";
 import { ringAreaHa, metres, fmtHa } from "../lib/geo.js";
 import { saveOutline } from "../lib/capture.js";
+import SheetClose from "./SheetClose.jsx";
 
 const MAX_ACCURACY_M = 20;
 const MIN_STEP_M = 3;
@@ -65,6 +66,7 @@ export default function WalkBoundary({ fields, initialId, isConsole, center, onC
   return (
     <div className="sheet" onClick={() => status !== "walking" && onClose(false)}>
       <div className="panel" onClick={(e) => e.stopPropagation()}>
+        <SheetClose onClose={() => status !== "walking" && onClose(false)} />
         <h2>Walk the boundary</h2>
         <select className="note-input" value={fieldId} disabled={status !== "idle"} onChange={(e) => setFieldId(e.target.value)}>
           {fields.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}

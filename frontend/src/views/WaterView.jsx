@@ -38,9 +38,9 @@ export default function WaterView() {
 
       <div className="card wb-status">
         <div>
-          <b>Phase 2 checkbook planner</b>
-          <div style={{ fontSize: 12.5, color: "var(--tm)", marginTop: 2 }}>
-            deficit = deficit + ET<sub>c</sub> − rain − irrigation · irrigate at MAD
+          <b>Soil-moisture planner</b>
+          <div style={{ fontSize: 13, color: "var(--tm)", marginTop: 2 }}>
+            Works out each bed&apos;s watering from the weather, rain and past irrigation.
           </div>
         </div>
         <button className={`btn ${data.enabled ? "primary" : "ghost"}`} disabled={busy}
@@ -51,8 +51,8 @@ export default function WaterView() {
 
       {!data.enabled && (
         <p className="evidence-note" style={{ margin: "4px 0 10px" }}>
-          Shifts currently come from the Phase 1 tank budget. The ledger below runs
-          in shadow so you can judge it before switching.
+          Watering is still planned from the tank budget. This planner runs alongside
+          so you can compare before switching it on.
         </p>
       )}
 
@@ -77,6 +77,7 @@ export default function WaterView() {
 }
 
 function BlockCard({ b }) {
+  const [numbers, setNumbers] = useState(false);
   const pct = Math.min(100, (b.deficit_mm / b.config.taw_mm) * 100);
   const over = b.deficit_mm >= b.mad_mm;
   const last7 = b.rows.slice(-7);
@@ -86,8 +87,9 @@ function BlockCard({ b }) {
     <div className="card" style={{ marginTop: 12 }}>
       <div className="row">
         <h3>{b.block_name}</h3>
-        <span className={`chip ${over ? "P1" : "P2"}`}>{over ? "irrigate" : "ok"}</span>
+        <span className={`chip ${over ? "P1" : "state-verified_closed"}`}>{over ? "Water today" : "Fine"}</span>
       </div>
+      <p className="plain-summary">{summary(b, over)}</p>
 
       <div className="wb-gauge">
         <div className="track">
@@ -95,14 +97,17 @@ function BlockCard({ b }) {
           <div className="mad" style={{ left: `${b.config.mad * 100}%` }} />
         </div>
         <div className="wb-gauge-labels">
-          <span><b>{b.deficit_mm} mm</b> deficit</span>
-          <span>MAD {b.mad_mm} mm</span>
-          <span>TAW {b.config.taw_mm} mm</span>
+          <span><b>{b.deficit_mm} mm</b> used from the soil</span>
+          <span>water at {b.mad_mm} mm</span>
+          <span>dry at {b.config.taw_mm} mm</span>
         </div>
       </div>
 
       <Spark rows={b.rows} taw={b.config.taw_mm} mad={b.mad_mm} />
 
+      <button type="button" className="link-toggle" aria-expanded={numbers} onClick={() => setNumbers(!numbers)}>
+        {numbers ? "Hide the numbers" : "Show the numbers"}</button>
+      {numbers && <>
       <table className="wb-table">
         <thead><tr><th>day</th><th>ET₀</th><th>ETc</th><th>rain</th><th>irr</th><th>deficit</th></tr></thead>
         <tbody>
@@ -122,6 +127,7 @@ function BlockCard({ b }) {
         Kc {b.config.kc} · {b.config.area_m2.toLocaleString()} m² · {b.config.rate_mm_h} mm/h at {Math.round(b.config.efficiency * 100)}% efficiency.
         {normalDays > 0 && ` * ${normalDays} day(s) used climate-normal ET₀ (no forecast/reading).`}
       </p>
+      </>}
     </div>
   );
 }
@@ -138,4 +144,19 @@ function Spark({ rows, taw, mad }) {
       <path d={line} fill="none" stroke="var(--b5)" strokeWidth="2" strokeLinejoin="round" />
     </svg>
   );
+}
+
+// The one sentence the owner needs: water today (how long, how much) or when next.
+function summary(b, over) {
+  const c = b.config;
+  if (over) {
+    // Shifts are capped at 3 h; litres are what that shift delivers (1 mm on 1 m² = 1 L).
+    const full = Math.round((b.deficit_mm / (c.rate_mm_h * c.efficiency)) * 60);
+    const minutes = Math.min(180, full);
+    const litres = Math.round(c.rate_mm_h * (minutes / 60) * c.area_m2);
+    return `Needs water today: about ${minutes} min (${litres.toLocaleString()} L)${full > 180 ? ", the first of several shifts" : ""}.`;
+  }
+  const use = b.rows.at(-1)?.etc || 0;
+  const days = use > 0 ? Math.max(1, Math.round((b.mad_mm - b.deficit_mm) / use)) : null;
+  return days ? `Soil moisture is fine; next watering in about ${days} day${days > 1 ? "s" : ""}.` : "Soil moisture is fine.";
 }

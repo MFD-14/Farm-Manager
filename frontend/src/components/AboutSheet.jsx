@@ -3,6 +3,7 @@
 // and from the sign-in page.
 import React from "react";
 import { getServerUrl } from "../lib/api.js";
+import SheetClose from "./SheetClose.jsx";
 
 export const OWNER = "Musara Holdings LLC";
 export const COPYRIGHT = `© 2026 ${OWNER}. All rights reserved.`;
@@ -14,6 +15,7 @@ export default function AboutSheet({ onClose, user }) {
   return (
     <div className="sheet" onClick={onClose}>
       <div className="panel about" onClick={(e) => e.stopPropagation()}>
+        <SheetClose onClose={onClose} />
         <div className="about-mark">
           <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
             <path d="M11 20A7 7 0 019.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.8 10-10 10z" />

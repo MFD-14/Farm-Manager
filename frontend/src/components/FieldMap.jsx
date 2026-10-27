@@ -9,7 +9,9 @@ const IMAGERY = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imag
 const FARM_CENTER = { lat: -18.9281, lng: 29.8149 }; // FARM_LAT / FARM_LNG default
 const latlngs = (ring) => ring.map(([lng, lat]) => [lat, lng]);
 
-export default function FieldMap({ locations = [], center = FARM_CENTER, track, selected, onSelect, height = 300 }) {
+// emptyText: shown over the map when there's nothing outlined yet; children
+// float over the map (the walk button).
+export default function FieldMap({ locations = [], center = FARM_CENTER, track, selected, onSelect, height = 300, emptyText, children }) {
   const el = useRef(null);
   const map = useRef(null);
   const layer = useRef(null);
@@ -55,5 +57,11 @@ export default function FieldMap({ locations = [], center = FARM_CENTER, track, 
     }
   }, [locations, track, selected, onSelect]);
 
-  return <div ref={el} className="field-map" style={{ height }} />;
+  return (
+    <div className="field-map-wrap">
+      <div ref={el} className="field-map" style={{ height }} />
+      {emptyText && <div className="map-empty">{emptyText}</div>}
+      {children}
+    </div>
+  );
 }

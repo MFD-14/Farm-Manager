@@ -3,6 +3,7 @@
 // Accounts are never deleted, because the farm history records who did what.
 import React, { useEffect, useState } from "react";
 import { apiJson, errorMessage, getServerUrl } from "../lib/api.js";
+import SheetClose from "./SheetClose.jsx";
 
 function when(ts) {
   if (!ts) return "never";
@@ -166,6 +167,7 @@ export default function PeopleSheet({ onClose, onPendingChanged }) {
   return (
     <div className="sheet" onClick={onClose}>
       <div className="panel" onClick={(e) => e.stopPropagation()}>
+        <SheetClose onClose={onClose} />
         <h2>People</h2>
         <div className="code">Everyone who signs in to Woodlands</div>
 

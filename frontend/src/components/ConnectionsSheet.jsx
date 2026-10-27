@@ -2,6 +2,7 @@
 // again; the sheet only shows that one is saved and its last four characters.
 import React, { useEffect, useState } from "react";
 import { apiJson, errorMessage } from "../lib/api.js";
+import SheetClose from "./SheetClose.jsx";
 
 const STATUS_CLASS = { sent: "ok", delivered: "ok", read: "ok", processed: "ok", failed: "bad",
   logged_only: "muted", skipped_window_closed: "warn", skipped_no_phone: "warn", ignored_not_allowlisted: "warn" };
@@ -198,6 +199,7 @@ export default function ConnectionsSheet({ onClose }) {
   return (
     <div className="sheet" onClick={onClose}>
       <div className="panel" onClick={(e) => e.stopPropagation()}>
+        <SheetClose onClose={onClose} />
         <h2>WhatsApp</h2>
         <div className="code">The farm's WhatsApp Business number</div>
         {err && <p className="form-msg bad">{err}</p>}

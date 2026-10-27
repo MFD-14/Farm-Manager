@@ -262,6 +262,8 @@ test("dashboard: week to date counts labour hours from clock pairs and this week
   assert.equal(d.week.labour_hours.now, 8);
   assert.deepEqual(d.week.labour_by_person, [{ name: "Caretaker", hours: 8 }]);
   assert.deepEqual(d.week.revenue_usd, { now: 50, before: 40 });
+  assert.equal(d.week.daily.revenue_usd.length, 7);
+  assert.equal(d.week.daily.revenue_usd[6], 50, "today is the last point");
 });
 
 test("revenue: caretakers enter a sale's amount but never get amounts back; dashboard and KPIs are console-only", async () => {

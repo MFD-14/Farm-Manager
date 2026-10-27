@@ -12,9 +12,13 @@ const STATUS_CHIP = { active: "state-verified_closed", planted: "P2", fallow: "P
 const STATUS_LABEL = { active: "in use" };
 const SPECIES_LABEL = { cattle: "Cattle", goats: "Goats", pigs: "Pigs" };
 
+// One screen, five tabs, instead of one very long page.
+const TABS = [["map", "Map"], ["plan", "Plan"], ["water", "Water"], ["stock", "Stock"], ["land", "Land"]];
+
 export default function FarmView({ isConsole }) {
   const [data, setData] = useState(null);
   const [stale, setStale] = useState(false);
+  const [tab, setTab] = useState("map");
 
   useEffect(() => {
     (async () => {
@@ -37,16 +41,20 @@ export default function FarmView({ isConsole }) {
       <div className="daytitle">{farm.name}</div>
       <p className="farm-sub">{farm.subdivision} · {farm.location}</p>
       {stale && <p className="evidence-note" style={{ marginBottom: 8 }}>Offline — showing last synced data</p>}
+      <div className="tabs-inline" role="tablist">
+        {TABS.map(([k, l]) => <button type="button" role="tab" aria-selected={tab === k} key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{l}</button>)}
+      </div>
+      {tab === "map" && <>
       <FieldsSection isConsole={isConsole} center={farm.coordinates} />
-
       <div className="stat-row">
         <div className="stat"><div className="v">{farm.total_ha}</div><div className="l">hectares</div></div>
         <div className="stat"><div className="v">{farm.cropped_ha}</div><div className="l">cropped ha</div></div>
         <div className="stat"><div className="v">{livestock.totals.cattle + livestock.totals.goats + livestock.totals.pigs}</div><div className="l">head stock</div></div>
       </div>
 
-      <PlanSection />
-
+      </>}
+      {tab === "plan" && <PlanSection />}
+      {tab === "water" && <>
       <div className="section-title">Water system</div>
       <div className="card">
         {water.stored_pct !== null && (
@@ -84,6 +92,8 @@ export default function FarmView({ isConsole }) {
         )}
       </div>
 
+      </>}
+      {tab === "stock" && <>
       <div className="section-title">Livestock</div>
       {livestock.herds.map((h) => (
         <div className="card" key={h.name}>
@@ -110,6 +120,8 @@ export default function FarmView({ isConsole }) {
         </div>
       ))}
 
+      </>}
+      {tab === "land" && <>
       <div className="section-title">Land · {farm.cropped_ha} of {farm.total_ha} ha in use</div>
       <div className="card">
         {blocks.map((b) => (
@@ -129,6 +141,7 @@ export default function FarmView({ isConsole }) {
           </div>
         ))}
       </div>
+      </>}
     </div>
   );
 }

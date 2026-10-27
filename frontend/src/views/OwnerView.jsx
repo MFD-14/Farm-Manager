@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { apiJson, mediaBlob } from "../lib/api.js";
 import { queueDecision, pendingDecisions, cachedMediaBlob, cacheMediaBlob, metaGet, metaSet } from "../lib/db.js";
 import { drainOnce } from "../lib/sync.js";
+import SheetClose from "../components/SheetClose.jsx";
 
 // Evidence from the server, kept on the phone after the first look so the
 // queue can be reviewed with no signal.
@@ -64,6 +65,21 @@ export default function OwnerView({ tab }) {
   return <Digest />;
 }
 
+// Week-on-week change in words; no comparison when last week had nothing.
+const trend = (p) => (!p.before ? (p.now ? "new this week" : "nothing yet this week")
+  : `${p.now >= p.before ? "up" : "down"} ${Math.abs(Math.round(((p.now - p.before) / p.before) * 100))}% on last week`);
+
+// A 7-day trend line (decorative: the number above carries the meaning).
+function Spark({ values, label }) {
+  const max = Math.max(...values, 1);
+  const pts = values.map((v, i) => `${(i / (values.length - 1)) * 100},${26 - (v / max) * 24}`).join(" ");
+  return (
+    <svg className="spark" viewBox="0 0 100 28" preserveAspectRatio="none" role="img" aria-label={label}>
+      <polyline points={pts} fill="none" stroke="var(--g6)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
 function Digest() {
   const [digest, setDigest] = useState(null);
   const [err, setErr] = useState(null);
@@ -74,6 +90,7 @@ function Digest() {
   if (!digest) return <div className="empty">Loading…</div>;
   const c = digest.completion;
   const w = digest.week;
+  const tank = digest.water.tank_pct;
   return (
     <div className="wrap">
       <div className="daytitle">Dashboard</div>
@@ -85,12 +102,13 @@ function Digest() {
         </div>
       )}
       <div className="week-grid">
-        {[["Revenue", w.revenue_usd, (v) => `$${Math.round(v).toLocaleString()}`], ["Bundles harvested", w.bundles_harvested],
-          ["New plantings", w.plantings], ["Labour hours", w.labour_hours]].map(([label, p, f = (v) => v]) => (
+        {[["Revenue", w.revenue_usd, (v) => `$${Math.round(v).toLocaleString()}`, w.daily?.revenue_usd], ["Bundles harvested", w.bundles_harvested, undefined, w.daily?.bundles_harvested],
+          ["New plantings", w.plantings], ["Labour hours", w.labour_hours]].map(([label, p, f = (v) => v, series]) => (
           <div className="stat" key={label}>
             <div className="l">{label}</div>
             <div className="v">{f(p.now)}</div>
-            <div className="l">{p.before ? `${p.now >= p.before ? "+" : ""}${Math.round(((p.now - p.before) / p.before) * 100)}%` : "–"} on last week</div>
+            {series?.some((x) => x > 0) && <Spark values={series} label={`${label}, last 7 days`} />}
+            <div className="l">{trend(p)}</div>
           </div>
         ))}
       </div>
@@ -102,9 +120,14 @@ function Digest() {
       )}
       <div className="section-title">Today</div>
       <div className="stat-row">
-        <div className="stat"><div className="v">{c.verified}/{c.total}</div><div className="l">verified</div></div>
-        <div className="stat"><div className="v">{c.missed}</div><div className="l">missed</div></div>
-        <div className="stat"><div className="v">{digest.water.tank_pct ?? "–"}%</div><div className="l">tank</div></div>
+        <div className={`stat ${c.missed ? "bad" : c.total && c.verified === c.total ? "good" : ""}`}>
+          <div className="v">{c.verified} of {c.total}</div><div className="l">tasks done{c.missed ? ` · ${c.missed} missed` : ""}</div>
+        </div>
+        <div className={`stat ${tank == null ? "" : tank >= 50 ? "good" : tank >= 30 ? "warn" : "bad"}`}>
+          {tank == null ? <><div className="v">No reading</div><div className="l">tank · first reading at 06:00</div></>
+            : <><div className="v">{tank}%</div><div className="wb-gauge"><div className="track"><div className="fill" style={{ width: `${Math.min(100, tank)}%` }} /></div></div>
+              <div className="l">tank · {tank >= 50 ? "fine" : tank >= 30 ? "getting low" : "low: water rationing"}</div></>}
+        </div>
       </div>
       <div className="card">
         <div className="kv"><span>Rain today</span><b>{digest.water.rain_mm ?? 0} mm</b></div>
@@ -114,12 +137,10 @@ function Digest() {
           </div>
         )}
         <div className="kv"><span>Litres pumped</span><b>{digest.water.litres_pumped.toLocaleString()}</b></div>
-        <div className="kv"><span>Bundles harvested</span><b>{digest.money.bundles_harvested}</b></div>
-        <div className="kv"><span>Bundles sold</span><b>{digest.money.bundles_sold}</b></div>
-        <div className="kv"><span>Sales recorded</span><b>${digest.money.sales_usd}</b></div>
-        <div className="kv"><span>Cash variance</span><b>{digest.money.cash_variance ?? "–"}</b></div>
+        <div className="kv"><span>Sold today</span><b>{digest.money.bundles_sold} bundles · ${digest.money.sales_usd}</b></div>
+        {digest.money.cash_variance != null && <div className="kv"><span>Cash difference</span><b>${digest.money.cash_variance}</b></div>}
       </div>
-      <div className="section-title">Exceptions needing you ({digest.exceptions.length})</div>
+      <div className="section-title">Needs a decision · {digest.exceptions.length}</div>
       {digest.exceptions.length === 0 && <div className="empty">Nothing needs a decision.</div>}
       {digest.exceptions.map((ex, i) => (
         <div className="card" key={i}>
@@ -309,6 +330,7 @@ function Decisions() {
       {detail && (
         <div className="sheet" onClick={() => setDetail(null)}>
           <div className="panel" onClick={(e) => e.stopPropagation()}>
+            <SheetClose onClose={() => setDetail(null)} />
             <h2>{detail.instance.title}</h2>
             <div className="code">{detail.instance.template_code} · {detail.instance.state.replaceAll("_", " ")}</div>
             <div className="section-title">History</div>
@@ -329,50 +351,76 @@ function Decisions() {
   );
 }
 
+// Status from a value and its target, always with words (never colour alone).
+const STATUS = { good: "on track", warn: "behind", bad: "needs attention", none: "no data yet" };
+const judge = (v, good, warn) => (v == null || v === "–" ? "none" : good(Number(v)) ? "good" : warn && warn(Number(v)) ? "warn" : "bad");
+
 function Kpis() {
   const [kpis, setKpis] = useState(null);
   const [period, setPeriod] = useState(7);
+  const [system, setSystem] = useState(false);
   useEffect(() => {
     apiJson(`/api/owner/kpis?period=${period}`).then(setKpis).catch(() => setKpis({}));
   }, [period]);
   if (!kpis) return <div className="empty">Loading…</div>;
-  const rows = [
-    ["On-time verified P0/P1", pct(kpis.on_time_verified_p1_pct), ">= 90%"],
-    ["Overall completion", pct(kpis.overall_completion_pct), ">= 85%"],
-    ["Accepted first time", pct(kpis.accepted_first_time_pct), ">= 90%"],
-    ["Hours to accept (median)", kpis.median_hours_to_accept ?? "–", "< 24h"],
-    ["Waiting for acceptance now", kpis.waiting_for_acceptance ?? 0, "low"],
-    ["Sent back", kpis.sent_back ?? 0, "declining"],
-    ["Evidence integrity flags", kpis.evidence_integrity_flags, "0"],
-    ["Median sync latency", kpis.median_sync_latency_s != null ? `${kpis.median_sync_latency_s}s` : "–", "< 6h"],
-    ["Kale bundles, daily mean", kpis.kale_bundles_daily_mean, `${kpis.kale_target_bundles_per_day ?? 330}–400`],
-    ["Revenue recorded", `$${kpis.revenue_recorded_usd ?? 0}`, "period"],
-    ["Revenue, monthly run rate", `$${(kpis.revenue_monthly_run_rate_usd ?? 0).toLocaleString()}`, "$10–12k/mo"],
-    ["Layers", kpis.layers_now ?? 0, "1,000+ by Jun 2027"],
-    ["Water pumped", `${((kpis.water_pumped_l ?? 0) / 1000).toFixed(1)} m³`, "90–110% plan"],
-    ["Litres per bundle", kpis.water_l_per_bundle ?? "–", "declining"],
-    ["Cattle BCS median", kpis.cattle_bcs_median ?? "–", "2.5 → 3.0"],
-    ["Poultry mortality (sum)", kpis.poultry_mortality_sum ?? 0, "< 0.5%/wk"],
-    ["PM compliance", pct(kpis.pm_compliance_pct), ">= 90%"],
-    ["Escalations to owner", kpis.escalations_to_owner ?? 0, "declining"],
-    ["Dark-farm incidents", kpis.dark_farm_incidents ?? 0, "0"],
+  const k = kpis;
+  const target = k.kale_target_bundles_per_day ?? 330;
+  // [label, shown value, target text, status]
+  const headline = [
+    ["Revenue, monthly run rate", `$${(k.revenue_monthly_run_rate_usd ?? 0).toLocaleString()}`, "$10–12k a month",
+      judge(k.revenue_recorded_usd ? k.revenue_monthly_run_rate_usd : null, (v) => v >= 10000, (v) => v > 0)],
+    ["Kale bundles a day", k.kale_bundles_daily_mean ?? "–", `${target}–400`, judge(k.kale_bundles_daily_mean || null, (v) => v >= target, (v) => v > 0)],
+    ["Layers", k.layers_now ?? "–", "1,000+ by Jun 2027", judge(k.layers_now, (v) => v >= 1000, (v) => v > 0)],
+    ["Cattle condition (BCS)", k.cattle_bcs_median ?? "–", "2.5 → 3.0", judge(k.cattle_bcs_median, (v) => v >= 3, (v) => v >= 2.5)],
   ];
+  const groups = [
+    ["Work", [
+      ["Urgent tasks on time", pct(k.on_time_verified_p1_pct), "90% or more", judge(k.on_time_verified_p1_pct, (v) => v >= 90, (v) => v >= 70)],
+      ["All tasks completed", pct(k.overall_completion_pct), "85% or more", judge(k.overall_completion_pct, (v) => v >= 85, (v) => v >= 65)],
+      ["Accepted first time", pct(k.accepted_first_time_pct), "90% or more", judge(k.accepted_first_time_pct, (v) => v >= 90, (v) => v >= 75)],
+      ["Hours to accept (median)", k.median_hours_to_accept ?? "–", "under 24 h", judge(k.median_hours_to_accept, (v) => v < 24, (v) => v < 48)],
+      ["Waiting for acceptance now", k.waiting_for_acceptance ?? 0, "low", judge(k.waiting_for_acceptance ?? 0, (v) => v === 0, (v) => v <= 10)],
+      ["Sent back", k.sent_back ?? 0, "falling", judge(k.sent_back ?? 0, (v) => v === 0, () => true)],
+    ]],
+    ["Water and stock", [
+      ["Water pumped", `${((k.water_pumped_l ?? 0) / 1000).toFixed(1)} m³`, "90–110% of plan", k.water_pumped_l ? "good" : "none"],
+      ["Litres per bundle", k.water_l_per_bundle ?? "–", "falling", k.water_l_per_bundle ? "good" : "none"],
+      ["Poultry deaths", k.poultry_mortality_sum ?? 0, "under 0.5% a week", judge(k.poultry_mortality_sum ?? 0, (v) => v === 0, () => true)],
+      ["Maintenance on time", pct(k.pm_compliance_pct), "90% or more", judge(k.pm_compliance_pct, (v) => v >= 90, (v) => v >= 70)],
+    ]],
+  ];
+  const health = [
+    ["Evidence integrity flags", k.evidence_integrity_flags ?? 0, "0", judge(k.evidence_integrity_flags ?? 0, (v) => v === 0)],
+    ["Median sync delay", k.median_sync_latency_s != null ? `${Math.round(k.median_sync_latency_s / 60)} min` : "–", "under 6 h", judge(k.median_sync_latency_s, (v) => v < 21600, (v) => v < 86400)],
+    ["Escalations to owner", k.escalations_to_owner ?? 0, "falling", judge(k.escalations_to_owner ?? 0, (v) => v === 0, () => true)],
+    ["Days the farm went quiet", k.dark_farm_incidents ?? 0, "0", judge(k.dark_farm_incidents ?? 0, (v) => v === 0)],
+  ];
+  const row = ([label, value, tgt, st]) => (
+    <div className="kv" key={label}>
+      <span><i className={`kpi-dot ${st}`} aria-hidden="true" />{label}<small className="kpi-target"> · target {tgt} · {STATUS[st]}</small></span>
+      <b>{value ?? "–"}</b>
+    </div>
+  );
   return (
     <div className="wrap">
       <div className="daytitle">KPIs · last {period} days</div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        {[7, 30, 90].map((p) => (
-          <button key={p} className={`btn ${p === period ? "primary" : "ghost"}`} onClick={() => setPeriod(p)}>{p}d</button>
-        ))}
+      <div className="chips" role="tablist">
+        {[7, 30, 90].map((p) => <button key={p} type="button" className={p === period ? "on" : ""} onClick={() => setPeriod(p)}>{p} days</button>)}
       </div>
-      <div className="card">
-        {rows.map(([label, value, target]) => (
-          <div className="kv" key={label}>
-            <span>{label} <span style={{ color: "var(--tm)", fontSize: 11 }}>({target})</span></span>
-            <b>{value ?? "–"}</b>
+      <div className="week-grid">
+        {headline.map(([label, value, tgt, st]) => (
+          <div className={`stat ${st}`} key={label}>
+            <div className="l">{label}</div><div className="v">{value}</div>
+            <div className="l"><i className={`kpi-dot ${st}`} aria-hidden="true" />{STATUS[st]} · {tgt}</div>
           </div>
         ))}
       </div>
+      {groups.map(([g, rows]) => (
+        <React.Fragment key={g}><div className="section-title">{g}</div><div className="card">{rows.map(row)}</div></React.Fragment>
+      ))}
+      <button type="button" className="link-toggle" aria-expanded={system} onClick={() => setSystem(!system)}>
+        {system ? "Hide system health" : "Show system health"}</button>
+      {system && <div className="card">{health.map(row)}</div>}
     </div>
   );
 }

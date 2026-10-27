@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { pendingEvents, pendingMedia, pendingDecisions, updateMedia, removeMedia, metaGet, metaSet } from "../lib/db.js";
 import { syncNow, onSyncState } from "../lib/sync.js";
+import SheetClose from "./SheetClose.jsx";
 
 const size = (n) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const KIND = { photo: "📷 Photo", video: "🎥 Video", audio: "🎙️ Voice note" };
@@ -69,6 +70,7 @@ export default function SyncSheet({ online, onClose }) {
   return (
     <div className="sheet" onClick={onClose}>
       <div className="panel" onClick={(e) => e.stopPropagation()}>
+        <SheetClose onClose={onClose} />
         <h2>Sync & uploads</h2>
         <div className="code">{online ? "Online" : "No signal: everything is saved on this phone"} · last full sync {ago(lastOk)}</div>
 

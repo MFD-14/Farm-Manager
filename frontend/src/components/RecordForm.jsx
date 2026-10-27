@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { metaGet } from "../lib/db.js";
 import { RECORD_TYPES, saveRecord, today } from "../lib/records.js";
 import Attachments from "./Attachments.jsx";
+import SheetClose from "./SheetClose.jsx";
 
 export default function RecordForm({ type, onClose }) {
   const def = RECORD_TYPES[type];
@@ -45,6 +46,20 @@ export default function RecordForm({ type, onClose }) {
     onClose(true);
   }
 
+  // Quick picks: the chosen bed's crops for a crop field, Today / Yesterday for dates.
+  const bedCrops = (beds.find((b) => b.id === v.location_id)?.crop || "").split("+").map((c) => c.trim()).filter(Boolean);
+  const yesterday = (() => { const d = new Date(`${today()}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); })();
+  const picks = (f) => {
+    const opts = f.k === "crop" ? bedCrops.map((c) => [c, c]) : f.type === "date" && f.notFuture ? [["Today", today()], ["Yesterday", yesterday]] : [];
+    if (!opts.length) return null;
+    return (
+      <div className="quick-picks">
+        {opts.map(([label, val]) => <button type="button" key={label} className={v[f.k] === val ? "on" : ""}
+          onClick={() => setV({ ...v, [f.k]: val })}>{label}</button>)}
+      </div>
+    );
+  };
+
   const input = (f) => {
     const common = { className: `note-input ${errors[f.k] ? "invalid" : ""}`, value: v[f.k], onChange: (e) => setV({ ...v, [f.k]: e.target.value }) };
     if (f.type === "textarea") return <textarea rows={2} {...common} />;
@@ -68,11 +83,13 @@ export default function RecordForm({ type, onClose }) {
   return (
     <div className="sheet" onClick={() => onClose(false)}>
       <div className="panel" onClick={(e) => e.stopPropagation()}>
+        <SheetClose onClose={() => onClose(false)} />
         <h2>{def.label}</h2>
         {def.fields.map((f) => (
           <label className="form-field" key={f.k}>
             <span>{f.label}</span>
             {input(f)}
+            {picks(f)}
             {errors[f.k] && <small className="form-msg bad">{errors[f.k]}</small>}
           </label>
         ))}
@@ -89,6 +106,7 @@ export function AddSheet({ items, onPick, onClose }) {
   return (
     <div className="sheet" onClick={onClose}>
       <div className="panel" onClick={(e) => e.stopPropagation()}>
+        <SheetClose onClose={onClose} />
         {items.map((it) => (
           <button type="button" key={it.key} className="add-item" onClick={() => onPick(it.key)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={it.icon} /></svg>
