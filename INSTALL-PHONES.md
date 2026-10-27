@@ -51,8 +51,9 @@ else under **People**.
 > https://github.com/MFD-14/Farm-Manager/releases/download/android-latest/woodlands.apk
 
 Tap the downloaded file and allow installs from your browser when Android asks.
-On first launch, enter the server address (for example
-`https://farm.example.com`), then sign in.
+Open it and sign in: the farm's server address is built into the app
+(`VITE_SERVER_URL` in `frontend/.env.production`), so nobody is asked for it.
+If the server ever moves, change that line and the next build picks it up.
 
 A new APK is built automatically every time the app changes. Installing it goes
 over the previous version and keeps any unsynced records.

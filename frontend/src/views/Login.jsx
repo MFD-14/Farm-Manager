@@ -1,12 +1,10 @@
-import React, { useEffect, useState } from "react";
-import { getServerUrl, setServerUrl, isNativeShell, errorMessage, apiJson } from "../lib/api.js";
+import React, { useState } from "react";
+import { errorMessage, apiJson } from "../lib/api.js";
 import AboutSheet, { COPYRIGHT } from "../components/AboutSheet.jsx";
 
 export default function Login({ onLogin, notice }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [server, setServer] = useState("");
-  const [showServer, setShowServer] = useState(false);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -15,15 +13,6 @@ export default function Login({ onLogin, notice }) {
   const [name, setName] = useState("");
   const [confirm, setConfirm] = useState("");
   const [phone, setPhone] = useState("");
-  const native = isNativeShell();
-
-  useEffect(() => {
-    const current = getServerUrl();
-    setServer(current);
-    // The installed app is loaded from the phone itself, so it cannot guess the
-    // server: ask for it up front until one is saved.
-    setShowServer(native && !current);
-  }, [native]);
 
   async function signUp() {
     await apiJson("/api/auth/signup", {
@@ -37,21 +26,18 @@ export default function Login({ onLogin, notice }) {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
-      if (showServer || native) await setServerUrl(server);
       if (mode === "signup") return await signUp();
       await onLogin(email.trim(), password);
     } catch (e2) {
       const reachedServer = e2.status >= 400 && e2.status < 500;
       setErr(e2.status === 401 ? "Wrong email or password"
         : reachedServer ? errorMessage(e2)
-        : "Cannot reach the server. Check the server address.");
-      if (!reachedServer) setShowServer(true);
+        : "Cannot reach the farm server. Check the phone's internet connection and try again.");
     } finally {
       setBusy(false);
     }
   }
 
-  const needsServer = native && !server.trim();
   const signup = mode === "signup";
   const switchMode = (m) => { setMode(m); setErr(null); };
 
@@ -79,14 +65,6 @@ export default function Login({ onLogin, notice }) {
       <h1>Woodlands Farm Manager</h1>
       <div className="tagline">119.2 ha · Kwekwe, Midlands Province</div>
       {notice && <p className="form-msg bad">{notice}</p>}
-      {showServer && (
-        <div className="field">
-          <label>Server address</label>
-          <input type="url" inputMode="url" autoCapitalize="none" autoCorrect="off"
-            placeholder="https://farm.example.com" value={server}
-            onChange={(e) => setServer(e.target.value)} />
-        </div>
-      )}
       {signup && (
         <div className="field">
           <label>Your name</label>
@@ -119,22 +97,17 @@ export default function Login({ onLogin, notice }) {
       {err && <p style={{ color: "var(--r5)", fontSize: 13 }}>{err}</p>}
       {signup ? (
         <button className="btn primary block"
-          disabled={busy || !name.trim() || !email || password.length < 8 || password !== confirm || needsServer}>
+          disabled={busy || !name.trim() || !email || password.length < 8 || password !== confirm}>
           {busy ? "Sending…" : "Create account"}
         </button>
       ) : (
-        <button className="btn primary block" disabled={busy || !email || !password || needsServer}>
+        <button className="btn primary block" disabled={busy || !email || !password}>
           {busy ? "Signing in…" : "Sign in"}
         </button>
       )}
       <button type="button" className="link-btn" onClick={() => switchMode(signup ? "signin" : "signup")}>
         {signup ? "I already have an account" : "New here? Create an account"}
       </button>
-      {!showServer && (
-        <button type="button" className="link-btn" onClick={() => setShowServer(true)}>
-          Change server address
-        </button>
-      )}
       <button type="button" className="login-copyright" onClick={() => setShowAbout(true)}>
         {COPYRIGHT}
       </button>

@@ -2,8 +2,10 @@ import { metaGet, metaSet } from "./db.js";
 
 let token = null;
 // Server origin. Empty means "same origin" (the PWA served by the backend).
-// The native shells load the app from the device, so they need an absolute
-// address, entered once on the sign-in screen and remembered.
+// The native shells load the app from the device, so they use the address
+// built in at build time (VITE_SERVER_URL, frontend/.env.production); nobody
+// is asked for it.
+const BUILT_IN_SERVER = (import.meta.env.VITE_SERVER_URL || "").replace(/\/+$/, "");
 let serverUrl = "";
 
 export const isNativeShell = () =>
@@ -11,7 +13,7 @@ export const isNativeShell = () =>
 
 export async function loadToken() {
   token = await metaGet("token");
-  serverUrl = (await metaGet("server_url")) || "";
+  serverUrl = isNativeShell() ? BUILT_IN_SERVER : "";
   return token;
 }
 export async function setToken(t) {
@@ -24,12 +26,6 @@ export async function clearToken() {
 }
 
 export function getServerUrl() {
-  return serverUrl;
-}
-export async function setServerUrl(url) {
-  serverUrl = (url || "").trim().replace(/\/+$/, "");
-  if (serverUrl && !/^https?:\/\//i.test(serverUrl)) serverUrl = `https://${serverUrl}`;
-  await metaSet("server_url", serverUrl);
   return serverUrl;
 }
 
