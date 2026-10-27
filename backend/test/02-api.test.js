@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { prepareDb, resetDynamic, tx, q, instancesByCode, getInstance } from "./helpers.js";
 import { createApp } from "../src/app.js";
 import { runRelease } from "../src/engine/release.js";
+import { releaseTemplateNow } from "../src/engine/rules.js";
 
 const TODAY = "2026-08-03";
 let server, base, caretakerToken, ownerToken;
@@ -264,8 +265,8 @@ test("dashboard: week to date counts labour hours from clock pairs and this week
 });
 
 test("revenue: caretakers enter a sale's amount but never get amounts back; dashboard and KPIs are console-only", async () => {
-  await tx((c) => runRelease(c, TODAY));
-  const [sale] = await instancesByCode("C-02");
+  // Earlier sales were the daily C-02 task; their amounts stay hidden too.
+  const sale = { id: await tx((c) => releaseTemplateNow(c, "C-02", {})) };
   const s = await api("/api/sync/events", { method: "POST", token: caretakerToken, body: { events: [{
     event_uuid: randomUUID(), instance_id: sale.id, type: "done_reported",
     payload: { fields: { bundles_sold: 48, price_usd: 48, buyer: "Mbare market" } }, device_time: new Date().toISOString() }] } });

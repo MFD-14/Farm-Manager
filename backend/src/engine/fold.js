@@ -3,6 +3,7 @@
 // updated deterministically from events. rebuildProjections replays the log.
 
 import { applyOutline, addField } from "./fields.js";
+import { projectSale } from "./sales.js";
 import { applyTransition, isTerminal } from "./stateMachine.js";
 import { validateEvidence } from "./evidence.js";
 import { routeAfterDoneReported } from "./verification.js";
@@ -196,6 +197,7 @@ export async function foldEvent(c, event, { skipSideEffects = false, replay = fa
 
   if (!event.instance_id && event.payload?.outline) await applyOutline(c, event);
   if (!event.instance_id && event.payload?.record?.type === "field") await addField(c, event);
+  if (!event.instance_id && event.payload?.record?.type === "sale") await projectSale(c, event);
   if (!instance || conflict) return { status: "accepted", conflict };
 
   // Evidence summary maintenance

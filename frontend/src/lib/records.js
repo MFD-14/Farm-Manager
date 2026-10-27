@@ -1,11 +1,11 @@
-// Farm records that aren't scheduled tasks: harvests, plantings, activities
+// Farm records that aren't scheduled tasks: sales, harvests, plantings, activities
 // (with cost), feed, animal health, breeding, and new fields. Each is a
 // farm-level field_recorded event with a `record` payload, so it is written
 // offline and synced like everything else. A status change is a later record
 // of type "update" pointing at the first one; nothing is ever edited.
 import { useCallback, useEffect, useState } from "react";
 import { apiJson } from "./api.js";
-import { metaGet, metaSet, pendingEvents, queueEvent } from "./db.js";
+import { metaGet, metaSet, pendingEvents, queueEvent, queueMedia } from "./db.js";
 import { drainOnce } from "./sync.js";
 
 export const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Harare" });
@@ -20,6 +20,13 @@ const notes = { k: "notes", label: "Notes (optional)", type: "textarea" };
 
 // Field types: text, number (with optional units), date, choice, bed, group, textarea.
 export const RECORD_TYPES = {
+  sale: { label: "Record a sale", media: true, icon: "M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6",
+    fields: [{ k: "product", label: "Product", type: "choice", required: true, options: ["Kale", "Rape", "Tomato", "Onion", "Eggs", "Maize", "Sorghum", "Other"] },
+      { k: "quantity", label: "Quantity", type: "number", required: true, units: ["bundles", "kg", "crates", "trays", "bags"] },
+      { k: "price_usd", label: "Total received ($)", type: "number", required: true },
+      { k: "buyer", label: "Buyer", type: "text", required: true, initial: "Walk-in" },
+      { k: "payment", label: "Paid by", type: "choice", required: true, options: ["Cash", "EcoCash", "Bank transfer", "On account"] },
+      date("Date"), notes] },
   planting: { label: "Plant crop", icon: "M12 22V12M12 12C12 7 8 4 3 4c0 5 4 8 9 8zm0 0c0-5 4-8 9-8 0 5-4 8-9 8z",
     fields: [bed, { k: "crop", label: "Crop and variety", type: "text", required: true, placeholder: "e.g. Kale (Covo)" },
       { k: "plants", label: "Plants or seedlings", type: "number" }, date("Planted"),
@@ -56,7 +63,7 @@ export const RECORD_TYPES = {
 
 // Breeding records start as Pregnant (with an expected date); everything else
 // keeps the status it was saved with.
-export async function saveRecord(record) {
+export async function saveRecord(record, mediaItems = []) {
   const r = { ...record };
   if (r.type === "breeding") {
     r.status = "Pregnant";
@@ -64,8 +71,15 @@ export async function saveRecord(record) {
     d.setUTCDate(d.getUTCDate() + GESTATION_DAYS[r.species]);
     r.expected = d.toISOString().slice(0, 10);
   }
+  // Photos (a sale's load or cash tally) upload like a note's, with no task.
+  for (const m of mediaItems) {
+    await queueMedia({ media_uuid: m.media_uuid, instance_id: null, kind: m.kind, blob: m.blob, mime: m.blob?.type || null,
+      source: m.source || "camera", file_modified: m.file_modified || null, title: RECORD_TYPES[r.type]?.label || "Record",
+      captured_at: new Date().toISOString(), urgent: false });
+  }
   await queueEvent({ event_uuid: crypto.randomUUID(), instance_id: null, type: "field_recorded",
-    payload: { record: r }, device_time: new Date().toISOString() });
+    payload: { record: r, ...(mediaItems.length ? { media: mediaItems.map((m) => m.media_uuid) } : {}) },
+    device_time: new Date().toISOString() });
   drainOnce().catch(() => {});
 }
 

@@ -51,3 +51,26 @@ test("records: Add field creates a bed with its size for owners only", async () 
   await record(care, { type: "field", name: "Caretaker bed", size: 1, size_unit: "ha" });
   assert.equal((await q(`SELECT count(*)::int AS n FROM locations WHERE name = 'Caretaker bed'`)).rows[0].n, 0);
 });
+
+test("sales: any number a day (walk-ins), counted in revenue and bundles sold; amounts hidden from caretakers", async () => {
+  const sale = (q, usd, buyer) => record(care, { type: "sale", product: "Kale", quantity: q, unit: "bundles", price_usd: usd, buyer, payment: "Cash", date: "2026-10-27" });
+  await sale(40, 40, "Mbare market");
+  await sale(5, 5, "Walk-in");
+  await sale(3, 3, "Walk-in");
+  await record(care, { type: "sale", product: "Eggs", quantity: 2, unit: "trays", price_usd: 10, buyer: "Walk-in", payment: "EcoCash", date: "2026-10-27" });
+
+  const sum = async (m) => Number((await q(`SELECT COALESCE(SUM(value), 0) AS v FROM readings WHERE metric = $1`, [m])).rows[0].v);
+  assert.equal(await sum("sales_usd"), 58);
+  assert.equal(await sum("bundles_sold"), 48, "only sales counted in bundles");
+  assert.equal((await api("/api/owner/digest", { token: owner })).json.week.revenue_usd.now, 58);
+
+  const mine = (await api("/api/sync/notes?kind=record", { token: care })).json.notes.filter((n) => n.record.type === "sale");
+  assert.equal(mine.length, 4);
+  assert.ok(mine.every((n) => n.record.price_usd === undefined));
+  const own = (await api("/api/sync/notes?kind=record", { token: owner })).json.notes.filter((n) => n.record.type === "sale");
+  assert.equal(own.reduce((a, n) => a + n.record.price_usd, 0), 58);
+});
+
+test("sales: the old daily sales task no longer releases", async () => {
+  assert.equal((await q(`SELECT schedule FROM task_templates WHERE code = 'C-02'`)).rows[0].schedule, null);
+});

@@ -4,11 +4,13 @@
 import React, { useEffect, useState } from "react";
 import { metaGet } from "../lib/db.js";
 import { RECORD_TYPES, saveRecord, today } from "../lib/records.js";
+import Attachments from "./Attachments.jsx";
 
 export default function RecordForm({ type, onClose }) {
   const def = RECORD_TYPES[type];
   const [v, setV] = useState(() => Object.fromEntries(def.fields.map((f) => [f.k,
-    f.type === "date" && f.required ? today() : f.type === "choice" && f.required ? f.options[0] : ""])));
+    f.initial ?? (f.type === "date" && f.required ? today() : f.type === "choice" && f.required ? f.options[0] : "")])));
+  const [media, setMedia] = useState([]);
   const [units, setUnits] = useState(() => Object.fromEntries(def.fields.filter((f) => f.units).map((f) => [f.unitKey || "unit", f.units[0]])));
   const [errors, setErrors] = useState({});
   const [ref, setRef] = useState({ locations: [], herds: [], batches: [] });
@@ -39,7 +41,7 @@ export default function RecordForm({ type, onClose }) {
     const named = (list, id) => list.find((x) => x.id === id)?.name;
     if (out.location_id) out.location = named(beds, out.location_id);
     if (out.group_id) out.group = named(groups, out.group_id);
-    await saveRecord(out);
+    await saveRecord(out, media);
     onClose(true);
   }
 
@@ -74,7 +76,8 @@ export default function RecordForm({ type, onClose }) {
             {errors[f.k] && <small className="form-msg bad">{errors[f.k]}</small>}
           </label>
         ))}
-        <p className="evidence-note">Saved on this phone now; syncs when there's signal.</p>
+        {def.media && <label className="form-field"><span>Photo (optional)</span><Attachments items={media} setItems={setMedia} taskCode={type.toUpperCase()} /></label>}
+        {!def.media && <p className="evidence-note">Saved on this phone now; syncs when there's signal.</p>}
         <button type="button" className="btn primary block" onClick={save}>Save</button>
       </div>
     </div>
