@@ -10,21 +10,25 @@
 // The fetched forecast is stored in farm_settings under 'forecast' so the rule
 // engine, digest and rain page all read one snapshot; tests inject the same
 // shape directly and never touch the network.
+//
+// The same request returns the past 7 days (past_days=7); those become the
+// Open-Meteo rainfall estimates that fill days the gauge wasn't read
+// (engine/rainfall.js). The stored snapshot stays today onwards.
 import { config } from "../config.js";
+import { farmPoint } from "../engine/farmPoint.js";
+import { storeEstimates, SOURCES } from "../engine/rainfall.js";
+import { farmDateStr } from "../util/time.js";
 
-const LAT = process.env.FARM_LAT || "-18.9281";
-const LNG = process.env.FARM_LNG || "29.8149";
-
-const URL =
-  `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LNG}` +
-  `&daily=precipitation_sum,precipitation_probability_max,temperature_2m_max,` +
-  `temperature_2m_min,et0_fao_evapotranspiration` +
-  `&timezone=${encodeURIComponent(config.farmTz)}&forecast_days=7`;
-
-export async function fetchForecast(c) {
+export async function fetchForecast(c, { today = farmDateStr() } = {}) {
+  const { lat, lng } = await farmPoint(c);
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}` +
+    `&daily=precipitation_sum,precipitation_probability_max,temperature_2m_max,` +
+    `temperature_2m_min,et0_fao_evapotranspiration` +
+    `&timezone=${encodeURIComponent(config.farmTz)}&forecast_days=7&past_days=7`;
   let data;
   try {
-    const resp = await fetch(URL, { signal: AbortSignal.timeout(15_000) });
+    const resp = await fetch(url, { signal: AbortSignal.timeout(15_000) });
     if (!resp.ok) throw new Error(`open-meteo ${resp.status}`);
     data = await resp.json();
   } catch (err) {
@@ -33,7 +37,7 @@ export async function fetchForecast(c) {
     return { ok: false, error: err.message };
   }
   const d = data.daily || {};
-  const daily = (d.time || []).map((date, i) => ({
+  const all = (d.time || []).map((date, i) => ({
     date,
     rain_mm: Number(d.precipitation_sum?.[i] ?? 0),
     prob_pct: Number(d.precipitation_probability_max?.[i] ?? 0),
@@ -41,6 +45,10 @@ export async function fetchForecast(c) {
     tmin: Number(d.temperature_2m_min?.[i] ?? null),
     et0_mm: Number(d.et0_fao_evapotranspiration?.[i] ?? null),
   }));
+  const daily = all.filter((x) => x.date >= today);
+  const past = (d.time || []).flatMap((date, i) =>
+    (date < today && d.precipitation_sum?.[i] != null ? [[date, Math.round(d.precipitation_sum[i] * 10) / 10]] : []));
+  await storeEstimates(c, SOURCES["open-meteo"], Object.fromEntries(past));
   const snapshot = { provider: "open-meteo", fetched_at: new Date().toISOString(), daily };
   await c.query(
     `INSERT INTO farm_settings (key, value) VALUES ('forecast', $1)
@@ -49,15 +57,15 @@ export async function fetchForecast(c) {
 
   // Project today's reference ET0 into readings so the water-balance ledger
   // (spec 3.5 Phase 2) accumulates real values day by day, one row per day.
-  const today = daily[0];
-  if (today?.et0_mm != null && !Number.isNaN(today.et0_mm)) {
+  const first = daily[0];
+  if (first?.et0_mm != null && !Number.isNaN(first.et0_mm)) {
     await c.query(
       `INSERT INTO readings (metric, value, unit, taken_at)
        SELECT 'et0_mm', $1, 'mm', now()
        WHERE NOT EXISTS (
          SELECT 1 FROM readings WHERE metric = 'et0_mm'
            AND date_trunc('day', taken_at AT TIME ZONE 'Africa/Harare') = $2::date)`,
-      [today.et0_mm, today.date]);
+      [first.et0_mm, first.date]);
   }
   return { ok: true, days: daily.length };
 }

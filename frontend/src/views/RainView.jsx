@@ -1,6 +1,8 @@
 // Rainfall screen, raindrop-app style, with Daily / Weekly / Monthly views.
 // Monthly bars are drawn against the Kwekwe climate-calendar norms so a failing
-// rain year is visible at a glance. Data caches in IndexedDB for offline
+// rain year is visible at a glance. Days the gauge wasn't read are filled from
+// public estimates (Open-Meteo for the past week, NASA POWER for older days),
+// drawn striped and named as estimates. Data caches in IndexedDB for offline
 // viewing; the reading itself is captured through the daily W-08 task.
 import React, { useEffect, useState } from "react";
 import { apiJson } from "../lib/api.js";
@@ -56,7 +58,7 @@ export default function RainView({ onCaptureToday }) {
         <Drop fill={fill} />
         <div className="rain-today">
           <div className="mm">{fmt(data.today_mm)}<span> mm</span></div>
-          <div className="lbl">today</div>
+          <div className="lbl">{data.today_has_reading === false ? "no gauge reading yet today" : "today"}</div>
           {data.last_reading && (
             <div className="last">
               last reading {fmt(data.last_reading.mm)} mm ·{" "}
@@ -84,9 +86,10 @@ export default function RainView({ onCaptureToday }) {
         <>
           <div className="section-title">Last 14 days</div>
           <BarCard
-            items={data.days.map((d) => ({ key: d.date, mm: d.mm, label: d.date.slice(8) }))}
+            items={data.days.map((d) => ({ key: d.date, mm: d.mm, label: d.date.slice(8), est: d.estimated, source: d.source }))}
             emptyText="No readings in this window."
           />
+          {data.days.some((d) => d.estimated) && <EstLegend />}
         </>
       )}
 
@@ -98,9 +101,11 @@ export default function RainView({ onCaptureToday }) {
               key: w.week_start, mm: w.mm,
               label: wkLabel(w.week_start),
               sub: w.rain_days ? `${w.rain_days}d` : "",
+              est: w.estimated_days > 0,
             }))}
             emptyText="No readings in the last 12 weeks."
           />
+          {data.weeks.some((w) => w.estimated_days) && <EstLegend some />}
           <WeeklySummary weeks={data.weeks} />
         </>
       )}
@@ -115,6 +120,7 @@ export default function RainView({ onCaptureToday }) {
                 key: m.month, mm: m.mm, label: moLabel(m.month),
                 norm: MONTH_NORMS[monthNum],
                 sub: m.rain_days ? `${m.rain_days}d` : "",
+                est: m.estimated_days > 0,
               };
             })}
             emptyText="No readings in the last 12 months."
@@ -123,6 +129,7 @@ export default function RainView({ onCaptureToday }) {
           <div className="card rain-legend">
             <span><i className="sw actual" /> recorded</span>
             <span><i className="sw norm" /> monthly norm</span>
+            {data.months.some((m) => m.estimated_days) && <span><i className="sw est" /> includes estimated days</span>}
           </div>
         </>
       )}
@@ -138,11 +145,16 @@ export default function RainView({ onCaptureToday }) {
         <div className="kv"><span>Rain days</span><b>{data.season.rain_days}</b></div>
         {data.season.wettest_day && (
           <div className="kv"><span>Wettest day</span>
-            <b>{fmt(data.season.wettest_day.mm)} mm · {fmtDate(data.season.wettest_day.date)}</b>
+            <b>{fmt(data.season.wettest_day.mm)} mm · {fmtDate(data.season.wettest_day.date)}{data.season.wettest_day.estimated ? " (estimated)" : ""}</b>
           </div>
         )}
+        {data.season.estimated_days > 0 && (
+          <p className="evidence-note" style={{ textAlign: "left", marginTop: 8 }}>
+            Includes {data.season.estimated_days} day{data.season.estimated_days === 1 ? "" : "s"} without a gauge reading, estimated from public records (Open-Meteo, NASA POWER).
+          </p>
+        )}
         <p className="evidence-note" style={{ textAlign: "left", marginTop: 8 }}>
-          15 mm or more in 24 hours suppresses tomorrow&apos;s irrigation shifts automatically (rule T2).
+          A gauge reading of 15 mm or more in 24 hours suppresses tomorrow&apos;s irrigation shifts automatically (rule T2).
         </p>
       </div>
     </div>
@@ -159,13 +171,13 @@ function BarCard({ items, emptyText, showNorm = false }) {
       <div className="rain-bars" style={{ minHeight: H + 44 }}>
         {items.length === 0 && <div className="empty" style={{ padding: 18 }}>{emptyText}</div>}
         {items.map((i) => (
-          <div className="rain-bar" key={i.key} title={`${i.key}: ${fmt(i.mm)} mm`}>
+          <div className="rain-bar" key={i.key} title={`${i.key}: ${fmt(i.mm)} mm${i.est ? ` (${i.source ? `estimated, ${SOURCE_NAME[i.source]}` : "includes estimates"})` : ""}`}>
             <span className="v">{i.mm > 0 ? fmt(i.mm) : ""}</span>
             <div className="stack" style={{ height: H }}>
               {showNorm && i.norm !== undefined && (
                 <div className="bar ghost" style={{ height: `${Math.max(2, (i.norm / max) * H)}px` }} />
               )}
-              <div className="bar" data-dry={i.mm === 0}
+              <div className={`bar ${i.est ? "est" : ""}`} data-dry={i.mm === 0}
                 style={{ height: `${Math.max(i.mm > 0 ? 8 : 3, (i.mm / max) * H)}px` }} />
             </div>
             <span className="d">{i.label}</span>
@@ -173,6 +185,17 @@ function BarCard({ items, emptyText, showNorm = false }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+const SOURCE_NAME = { gauge: "farm gauge", "open-meteo": "Open-Meteo", nasa: "NASA POWER" };
+
+function EstLegend({ some }) {
+  return (
+    <div className="card rain-legend">
+      <span><i className="sw actual" /> farm gauge</span>
+      <span><i className="sw est" /> {some ? "includes estimated days" : "estimated (no gauge reading)"}</span>
     </div>
   );
 }

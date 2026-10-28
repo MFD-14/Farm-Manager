@@ -6,7 +6,9 @@ import { auth, requireRole, sign } from "../middleware/auth.js";
 import { buildDigest } from "../engine/digest.js";
 import { computeKpis } from "../engine/kpis.js";
 import { runRelease } from "../engine/release.js";
-import { farmDateStr } from "../util/time.js";
+import { farmDateStr, addDays } from "../util/time.js";
+import { dailyRain } from "../engine/rainfall.js";
+import { farmPoint } from "../engine/farmPoint.js";
 
 export const templatesRouter = Router();
 export const rulesRouter = Router();
@@ -74,112 +76,89 @@ ownerRouter.get("/digest", auth(), requireRole("owner", "admin", "manager"), asy
 
 // Rainfall history for the rain screen: daily totals, today, season-to-date.
 // The Zimbabwe rain year runs October to September, so the season accumulator
-// resets on 1 October.
+// resets on 1 October. Days without a gauge reading are filled from public
+// estimates (engine/rainfall.js) and marked with their source.
 ownerRouter.get("/rain", auth(), async (req, res) => {
   const days = Math.min(90, parseInt(req.query.days || "14", 10) || 14);
-  const daily = await q(
-    `SELECT to_char(date_trunc('day', taken_at AT TIME ZONE 'Africa/Harare'), 'YYYY-MM-DD') AS d,
-            SUM(value) AS mm
-     FROM readings WHERE metric = 'rain_mm'
-       AND taken_at >= now() - ($1 || ' days')::interval
-     GROUP BY 1 ORDER BY 1`, [days]);
-
-  const now = new Date();
-  const seasonStartYear = now.getUTCMonth() + 1 >= 10 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+  const todayStr = farmDateStr();
+  const y = Number(todayStr.slice(0, 4));
+  const seasonStartYear = Number(todayStr.slice(5, 7)) >= 10 ? y : y - 1;
   const seasonStart = `${seasonStartYear}-10-01`;
-  const season = await q(
-    `SELECT COALESCE(SUM(value),0) AS mm, COUNT(DISTINCT date_trunc('day', taken_at)) FILTER (WHERE value > 0) AS rain_days
-     FROM readings WHERE metric = 'rain_mm' AND taken_at >= $1::date`, [seasonStart]);
-  const last = await q(
-    `SELECT value, taken_at FROM readings WHERE metric = 'rain_mm' ORDER BY taken_at DESC LIMIT 1`);
-  const today = await q(
-    `SELECT COALESCE(SUM(value),0) AS mm FROM readings
-     WHERE metric = 'rain_mm' AND date_trunc('day', taken_at AT TIME ZONE 'Africa/Harare') =
-           date_trunc('day', now() AT TIME ZONE 'Africa/Harare')`);
-  const wettest = await q(
-    `SELECT to_char(date_trunc('day', taken_at AT TIME ZONE 'Africa/Harare'), 'YYYY-MM-DD') AS d, SUM(value) AS mm
-     FROM readings WHERE metric = 'rain_mm' AND taken_at >= $1::date
-     GROUP BY 1 ORDER BY 2 DESC LIMIT 1`, [seasonStart]);
+  const prevStart = `${seasonStartYear - 1}-10-01`;
+  const from = [prevStart, addDays(todayStr, -(days - 1))].sort()[0]; // covers the 12-month view too
+  const all = await tx((c) => dailyRain(c, from, todayStr));
+  const r1 = (n) => Math.round(n * 10) / 10;
+  const est = (list) => list.filter((x) => x.source && x.source !== "gauge").length;
+  const sum = (list) => r1(list.reduce((a, x) => a + (x.mm || 0), 0));
+  const wet = (list) => list.filter((x) => x.mm > 0).length;
+  const group = (keyOf, since) => {
+    const out = new Map();
+    for (const x of all.filter((x) => x.date >= since)) {
+      const k = keyOf(x.date);
+      if (!out.has(k)) out.set(k, []);
+      out.get(k).push(x);
+    }
+    return [...out.entries()].filter(([, l]) => l.some((x) => x.source));
+  };
 
-  // Weekly totals (last 12 ISO weeks) and monthly totals (last 12 months) for
-  // the week/month views of the rain page.
-  const weekly = await q(
-    `SELECT to_char(date_trunc('week', taken_at AT TIME ZONE 'Africa/Harare'), 'YYYY-MM-DD') AS wk,
-            SUM(value) AS mm,
-            COUNT(DISTINCT date_trunc('day', taken_at)) FILTER (WHERE value > 0) AS rain_days
-     FROM readings WHERE metric = 'rain_mm'
-       AND taken_at >= date_trunc('week', now() AT TIME ZONE 'Africa/Harare') - interval '11 weeks'
-     GROUP BY 1 ORDER BY 1`);
-  const monthly = await q(
-    `SELECT to_char(date_trunc('month', taken_at AT TIME ZONE 'Africa/Harare'), 'YYYY-MM') AS m,
-            SUM(value) AS mm,
-            COUNT(DISTINCT date_trunc('day', taken_at)) FILTER (WHERE value > 0) AS rain_days
-     FROM readings WHERE metric = 'rain_mm'
-       AND taken_at >= date_trunc('month', now() AT TIME ZONE 'Africa/Harare') - interval '11 months'
-     GROUP BY 1 ORDER BY 1`);
+  const recent = all.filter((x) => x.date > addDays(todayStr, -days) && x.source)
+    .map((x) => ({ date: x.date, mm: x.mm, source: x.source, estimated: x.source !== "gauge" }));
+  const seasonDays = all.filter((x) => x.date >= seasonStart);
+  const wettest = seasonDays.filter((x) => x.mm > 0).sort((a, b) => b.mm - a.mm)[0];
+
+  // Weekly totals (last 12 weeks, Monday start) and monthly (last 12 months).
+  const monday = (d) => addDays(d, -((new Date(`${d}T12:00:00Z`).getUTCDay() + 6) % 7));
+  const weeks = group(monday, addDays(monday(todayStr), -77))
+    .map(([wk, l]) => ({ week_start: wk, mm: sum(l), rain_days: wet(l), estimated_days: est(l) }));
+  const months = group((d) => d.slice(0, 7), `${addDays(`${todayStr.slice(0, 7)}-01`, -335).slice(0, 7)}-01`)
+    .map(([m, l]) => ({ month: m, mm: sum(l), rain_days: wet(l), estimated_days: est(l) }));
 
   // Season-vs-season comparison: cumulative curves for the current and previous
   // rain years, as day-of-season points (0 = 1 October).
-  const seasonCurve = async (startYear) => {
+  const seasonCurve = (startYear) => {
     const start = `${startYear}-10-01`;
     const end = `${startYear + 1}-10-01`;
-    const rows = await q(
-      `SELECT to_char(date_trunc('day', taken_at AT TIME ZONE 'Africa/Harare'), 'YYYY-MM-DD') AS d,
-              SUM(value) AS mm
-       FROM readings WHERE metric = 'rain_mm' AND taken_at >= $1::date AND taken_at < $2::date
-       GROUP BY 1 ORDER BY 1`, [start, end]);
     let cum = 0;
     const startMs = new Date(start + "T00:00:00Z").getTime();
-    const points = rows.rows.map((r) => {
-      cum += Number(r.mm);
-      return {
-        d: Math.round((new Date(r.d + "T00:00:00Z").getTime() - startMs) / 86_400_000),
-        mm: Math.round(cum * 10) / 10,
-      };
+    const list = all.filter((x) => x.date >= start && x.date < end && x.source);
+    const points = list.map((x) => {
+      cum += x.mm;
+      return { d: Math.round((new Date(x.date + "T00:00:00Z").getTime() - startMs) / 86_400_000), mm: r1(cum) };
     });
-    return {
-      label: `${startYear}/${String(startYear + 1).slice(2)}`,
-      start, points, total_mm: Math.round(cum * 10) / 10,
-    };
+    return { label: `${startYear}/${String(startYear + 1).slice(2)}`, start, points, total_mm: r1(cum), estimated_days: est(list) };
   };
-  const currentCurve = { ...(await seasonCurve(seasonStartYear)), current: true };
-  const previousCurve = await seasonCurve(seasonStartYear - 1);
-  const seasons = [currentCurve];
+  const seasons = [{ ...seasonCurve(seasonStartYear), current: true }];
+  const previousCurve = seasonCurve(seasonStartYear - 1);
   if (previousCurve.points.length) seasons.push(previousCurve);
 
+  const today = await q(
+    `SELECT COALESCE(SUM(value),0) AS mm, COUNT(*) AS n FROM readings
+     WHERE metric = 'rain_mm' AND (taken_at AT TIME ZONE 'Africa/Harare')::date = $1::date`, [todayStr]);
+  const last = await q(
+    `SELECT value, taken_at FROM readings WHERE metric = 'rain_mm' ORDER BY taken_at DESC LIMIT 1`);
   const forecastRow = await q(`SELECT value FROM farm_settings WHERE key = 'forecast'`);
-  const forecast = forecastRow.rows[0]?.value || null;
 
   res.json({
     today_mm: Number(today.rows[0].mm),
+    today_has_reading: Number(today.rows[0].n) > 0,
     last_reading: last.rows[0] ? { mm: Number(last.rows[0].value), at: last.rows[0].taken_at } : null,
-    days: daily.rows.map((r) => ({ date: r.d, mm: Number(r.mm) })),
-    weeks: weekly.rows.map((r) => ({ week_start: r.wk, mm: Number(r.mm), rain_days: Number(r.rain_days) })),
-    months: monthly.rows.map((r) => ({ month: r.m, mm: Number(r.mm), rain_days: Number(r.rain_days) })),
+    days: recent,
+    weeks,
+    months,
     seasons,
-    forecast,
+    forecast: forecastRow.rows[0]?.value || null,
     season: {
       start: seasonStart,
-      total_mm: Number(season.rows[0].mm),
-      rain_days: Number(season.rows[0].rain_days),
-      wettest_day: wettest.rows[0] ? { date: wettest.rows[0].d, mm: Number(wettest.rows[0].mm) } : null,
+      total_mm: sum(seasonDays),
+      rain_days: wet(seasonDays),
+      estimated_days: est(seasonDays),
+      wettest_day: wettest ? { date: wettest.date, mm: wettest.mm, estimated: wettest.source !== "gauge" } : null,
     },
   });
 });
 
 // Farm profile: land, livestock, flocks and the water system in one response,
 // with the derived figures an owner reasons from (buffer autonomy, cropped area).
-// Map centre: the middle of the imported farm boundary when there is one,
-// else FARM_LAT / FARM_LNG (default Kwekwe).
-async function farmCentre() {
-  const ring = (await q(`SELECT geom FROM locations WHERE code = 'FARM-BOUNDARY'`)).rows[0]?.geom?.coordinates?.[0];
-  if (ring?.length > 3) {
-    const pts = ring.slice(0, -1);
-    return { lat: pts.reduce((a, p) => a + p[1], 0) / pts.length, lng: pts.reduce((a, p) => a + p[0], 0) / pts.length };
-  }
-  return { lat: Number(process.env.FARM_LAT || -18.9281), lng: Number(process.env.FARM_LNG || 29.8149) };
-}
-
 ownerRouter.get("/farm", auth(), async (req, res) => {
   const blocks = (await q(
     `SELECT code, name, kind, crop, plant_count, hectares, soil, status, irrigated
@@ -217,7 +196,7 @@ ownerRouter.get("/farm", auth(), async (req, res) => {
       location: "Kwekwe, Midlands Province, Zimbabwe",
       total_ha: 119.2, mapped_ha: Math.round(mapped * 10) / 10,
       cropped_ha: Math.round(cropped * 10) / 10,
-      coordinates: await farmCentre(),
+      coordinates: await tx((c) => farmPoint(c)),
     },
     blocks,
     livestock: {

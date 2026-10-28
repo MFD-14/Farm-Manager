@@ -14,6 +14,7 @@
 // The ledger is a deterministic fold over readings — recomputed from a window,
 // never stored, in keeping with the system's projection discipline.
 import { addDays, farmDateStr, farmTime } from "../util/time.js";
+import { rainForDay } from "./rainfall.js";
 
 // Kwekwe long-term monthly reference ET0 (mm/day), used only when neither a
 // reading nor a forecast value exists for a day. Flagged as fallback so the
@@ -83,7 +84,7 @@ export async function computeLedger(c, blockCode, dateStr, { days = 21 } = {}) {
     const d = addDays(dateStr, -i);
     const { et0, source } = await et0For(c, d);
     const etc = block.kc * et0;
-    const rain = await daySum(c, "rain_mm", d);
+    const rain = await rainForDay(c, d); // gauge, else public estimate
     const irrLitres = await daySum(c, "irrigation_litres", d, subjectId);
     const irrMm = irrLitres / block.area_m2; // 1 L per m2 = 1 mm
     deficit = Math.min(block.taw_mm, Math.max(0, deficit + etc - rain - irrMm));

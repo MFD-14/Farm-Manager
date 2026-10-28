@@ -11,6 +11,7 @@ import { acceptanceSweep } from "./workers/vim.js";
 import { runMorningPlan } from "./workers/morningPlan.js";
 import { releasePlannedTasks } from "./engine/plans.js";
 import { fetchForecast } from "./workers/forecast.js";
+import { fetchNasaPower } from "./engine/rainfall.js";
 import { farmDateStr } from "./util/time.js";
 
 const TZ = { timezone: config.farmTz };
@@ -22,10 +23,12 @@ async function main() {
 
   // 04:15 farm time: pull the forecast so T2 can evaluate it before release;
   // also fetch once at boot. Failures are silent — the gauge path never depends
-  // on the network.
+  // on the network. NASA POWER rainfall estimates refresh on the same schedule.
   tx((c) => fetchForecast(c)).catch(() => {});
+  tx((c) => fetchNasaPower(c)).catch(() => {});
   cron.schedule("15 4 * * *", async () => {
     try { await tx((c) => fetchForecast(c)); } catch { /* keep last snapshot */ }
+    try { await tx((c) => fetchNasaPower(c)); } catch { /* keep last estimates */ }
   }, TZ);
 
   // 04:45 farm time: materialise the day (spec 3.6).
