@@ -130,12 +130,7 @@ export default function CaptureSheet({ instance, onClose, showCodes }) {
           </div>
         )}
 
-        {!isOpen && (
-          <p className="evidence-note">
-            This task is {instance.state.replaceAll("_", " ")}.
-            {["done_reported", "needs_review"].includes(instance.state) && " An owner or task manager will check the evidence and accept it."}
-          </p>
-        )}
+        {!isOpen && <TaskRecord instance={instance} policy={policy} />}
         {["done_reported", "needs_review", "blocked", "skip_pending"].includes(instance.state) && (
           <>
             <div className="section-title">Add more evidence</div>
@@ -231,6 +226,41 @@ export default function CaptureSheet({ instance, onClose, showCodes }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// Any task can be opened, finished or not: closed ones show their status in
+// plain words and what was recorded.
+const STATUS = {
+  done_reported: "Reported done. An owner or task manager will check it.",
+  needs_review: "Reported done, waiting for a check.",
+  skip_pending: "Skip asked, waiting for an owner or task manager.",
+  blocked: "Problem reported.",
+  verified_closed: "Done and checked.",
+  skipped: "Skipped.",
+  missed: "Missed: nothing was reported in time.",
+  expired: "No longer needed (cancelled by a rule, e.g. rain).",
+  cancelled: "Cancelled.",
+  superseded: "Replaced by a newer task.",
+  rejected_reopened: "Sent back to be done again.",
+};
+
+function TaskRecord({ instance, policy }) {
+  const s = instance.evidence_summary || {};
+  const labels = Object.fromEntries((policy.fields || []).map((f) => [f.key, `${f.label || f.key}${f.unit ? ` (${f.unit})` : ""}`]));
+  const fields = Object.entries(s.fields || {}).filter(([, v]) => v !== "" && v !== null && v !== undefined);
+  const media = [[s.photo_count, "photo"], [s.video_count, "video"], [s.voice_count, "voice note"]]
+    .filter(([n]) => n).map(([n, w]) => `${n} ${w}${n > 1 ? "s" : ""}`);
+  const when = (t) => new Date(t).toLocaleString("en-GB", { timeZone: "Africa/Harare", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return (
+    <div className="card">
+      <div className="kv"><span>Status</span><b>{STATUS[instance.state] || instance.state.replaceAll("_", " ")}</b></div>
+      {instance.due_at && <div className="kv"><span>Due</span><b>{when(instance.due_at)}</b></div>}
+      {instance.closed_at && <div className="kv"><span>Closed</span><b>{when(instance.closed_at)}</b></div>}
+      {fields.map(([k, v]) => <div className="kv" key={k}><span>{labels[k] || k.replaceAll("_", " ")}</span><b>{String(v)}</b></div>)}
+      {media.length > 0 && <div className="kv"><span>Evidence</span><b>{media.join(", ")}</b></div>}
+      {!fields.length && !media.length && <p className="evidence-note" style={{ textAlign: "left" }}>Nothing was recorded on this task.</p>}
     </div>
   );
 }

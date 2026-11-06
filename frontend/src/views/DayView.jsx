@@ -123,7 +123,7 @@ export default function DayView({ onCountsChanged, codes, title, onAddNote, canA
       {waiting.map((inst) => <TaskCard key={inst.id} inst={inst} showCodes={showCodes} onOpen={() => setActive(inst)} />)}
 
       {closed.length > 0 && <div className="section-title">Finished today · {closed.length}</div>}
-      {closed.map((inst) => <TaskCard key={inst.id} inst={inst} showCodes={showCodes} done />)}
+      {closed.map((inst) => <TaskCard key={inst.id} inst={inst} showCodes={showCodes} done onOpen={() => setActive(inst)} />)}
 
       {onAddNote && (
         <>
