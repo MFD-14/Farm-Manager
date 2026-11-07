@@ -136,7 +136,17 @@ export default function PeopleSheet({ onClose, onPendingChanged }) {
       setErr(errorMessage(e, "Couldn't load people. People needs a connection to the server."));
     }
   }
-  useEffect(() => { load(); }, []);
+  const [autoApprove, setAutoApprove] = useState(null);
+  useEffect(() => {
+    load();
+    apiJson("/api/users/signup-setting").then((r) => setAutoApprove(r.auto_approve)).catch(() => {});
+  }, []);
+  async function toggleAuto(on) {
+    try {
+      setAutoApprove((await apiJson("/api/users/signup-setting", { method: "PUT", body: { auto_approve: on } })).auto_approve);
+      if (on) { onPendingChanged?.(); await load(); }
+    } catch (e) { setErr(errorMessage(e)); }
+  }
 
   async function act(person, action) {
     setBusyId(person.id); setErr(null); setConfirm(null);
@@ -178,6 +188,14 @@ export default function PeopleSheet({ onClose, onPendingChanged }) {
           ? <PersonForm onSaved={saved} onCancel={() => setMode(null)} />
           : !otp && <button type="button" className="btn primary block" onClick={() => setMode("add")}>+ Add a person</button>}
 
+        {autoApprove !== null && (
+          <label className="toggle-row">
+            <span><b>Let new sign-ups in straight away</b>
+              <small>{autoApprove ? "Anyone who creates an account joins as a caretaker. Switch them off below if needed."
+                : "New accounts wait here for you to approve them."}</small></span>
+            <input type="checkbox" checked={autoApprove} onChange={(e) => toggleAuto(e.target.checked)} />
+          </label>
+        )}
         {!people && !err && <div className="empty">Loading…</div>}
         {people?.map((p) => p.pending_approval ? (
           <div key={p.id} className="card person pending">

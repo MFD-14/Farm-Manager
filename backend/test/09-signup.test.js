@@ -43,6 +43,8 @@ test("installer step makes the owner's own email the owner account", async () =>
 
 test("caretaker signs up, waits for approval, then signs in", async () => {
   const owner = (await login("boss@example.com", "boss-pass-2")).json.token;
+  const off = await api("/api/users/signup-setting", { method: "PUT", token: owner, body: { auto_approve: false } });
+  assert.equal(off.json.auto_approve, false);
 
   const bad = await api("/api/auth/signup", { method: "POST", body: { name: "T", email: "t@example.com", password: "123" } });
   assert.equal(bad.status, 400);
@@ -82,4 +84,29 @@ test("owner declines a sign-up and it is removed", async () => {
   assert.equal((await api(`/api/users/${id}/decline`, { method: "POST", token: owner })).status, 200);
   assert.equal((await q(`SELECT 1 FROM users WHERE id = $1`, [id])).rows.length, 0);
   assert.equal((await login("s@example.com", "stranger-1")).status, 401);
+});
+
+test("with auto-approve on, sign-ups get straight in and anyone waiting is let in", async () => {
+  const owner = (await login("boss@example.com", "boss-pass-2")).json.token;
+  await api("/api/users/signup-setting", { method: "PUT", token: owner, body: { auto_approve: false } });
+  await api("/api/auth/signup", { method: "POST", body: { name: "Waiting", email: "w@example.com", password: "waiting-1" } });
+  assert.equal((await login("w@example.com", "waiting-1")).status, 403);
+
+  const on = await api("/api/users/signup-setting", { method: "PUT", token: owner, body: { auto_approve: true } });
+  assert.equal(on.json.auto_approve, true);
+  assert.equal((await login("w@example.com", "waiting-1")).status, 200, "waiting account let in");
+  assert.equal((await api("/api/users/pending-count", { token: owner })).json.count, 0);
+
+  const su = await api("/api/auth/signup", { method: "POST", body: { name: "New", email: "n@example.com", password: "new-pass-1" } });
+  assert.equal(su.json.pending_approval, false);
+  const me = await login("n@example.com", "new-pass-1");
+  assert.equal(me.status, 200);
+  assert.equal(me.json.user.role, "caretaker");
+  const care = (await login("caretaker@woodlands.farm", "woodlands")).json.token;
+  assert.equal((await api("/api/users/signup-setting", { method: "PUT", token: care, body: { auto_approve: false } })).status, 403);
+});
+
+test("an account left waiting is let in at sign-in once auto-approve is on", async () => {
+  await q(`UPDATE users SET pending_approval = true, active = false WHERE email = 'n@example.com'`);
+  assert.equal((await login("n@example.com", "new-pass-1")).status, 200);
 });

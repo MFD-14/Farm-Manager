@@ -57,6 +57,33 @@ usersRouter.use(auth(), requireRole("owner", "admin"));
 usersRouter.param("id", (req, res, next, id) =>
   /^[0-9a-f-]{36}$/i.test(id) ? next() : res.status(404).json({ error: "not found" }));
 
+// Whether sign-ups get in straight away (as caretakers) or wait for an owner.
+// On unless the owner switches it off under People.
+export async function autoApproveSignups() {
+  const r = await q(`SELECT value FROM farm_settings WHERE key = 'signups'`);
+  return r.rows[0]?.value?.auto_approve !== false;
+}
+export async function approveUser(id) {
+  const r = await q(
+    `UPDATE users SET active = true, pending_approval = false, updated_at = now()
+     WHERE id = $1 AND pending_approval RETURNING *`, [id]);
+  if (r.rows[0]?.phone) await syncWaContact(r.rows[0].id, r.rows[0].phone);
+  return r.rows[0] || null;
+}
+
+usersRouter.get("/signup-setting", async (req, res) => {
+  res.json({ auto_approve: await autoApproveSignups() });
+});
+usersRouter.put("/signup-setting", async (req, res) => {
+  const auto = req.body?.auto_approve !== false;
+  await q(
+    `INSERT INTO farm_settings (key, value) VALUES ('signups', $1)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, [JSON.stringify({ auto_approve: auto })]);
+  // Turning it on lets in everyone already waiting.
+  if (auto) for (const u of (await q(`SELECT id FROM users WHERE pending_approval`)).rows) await approveUser(u.id);
+  res.json({ auto_approve: auto });
+});
+
 usersRouter.get("/pending-count", async (req, res) => {
   const r = await q(`SELECT count(*)::int AS n FROM users WHERE pending_approval`);
   res.json({ count: r.rows[0].n });

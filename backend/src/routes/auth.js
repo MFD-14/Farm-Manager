@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { q } from "../db/pool.js";
 import { sign, auth } from "../middleware/auth.js";
 import { normalizePhone } from "../util/phone.js";
-import { publicUser, normalizeEmail, validEmail, passwordProblem, syncWaContact } from "./users.js";
+import { publicUser, normalizeEmail, validEmail, passwordProblem, syncWaContact, autoApproveSignups, approveUser } from "./users.js";
 
 export const authRouter = Router();
 
@@ -11,10 +11,12 @@ authRouter.post("/login", async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: "email and password required" });
   const r = await q(`SELECT * FROM users WHERE lower(email) = $1`, [normalizeEmail(email)]);
-  const user = r.rows[0];
+  let user = r.rows[0];
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: "invalid credentials" });
   }
+  // Someone who signed up while approval was required gets in once it isn't.
+  if (user.pending_approval && await autoApproveSignups()) user = await approveUser(user.id);
   if (user.pending_approval) {
     return res.status(403).json({ error: "Your account is waiting for the farm owner to approve it." });
   }
@@ -23,9 +25,9 @@ authRouter.post("/login", async (req, res) => {
   res.json({ token: sign(user), user: publicUser(user) });
 });
 
-// Self sign-up from the sign-in screen. The account starts as a caretaker that
-// can't sign in until an owner approves it under People, so finding the server
-// address isn't enough to get in.
+// Self sign-up from the sign-in screen. The account is a caretaker. With
+// auto-approve on (the default) it can sign in straight away; with it off it
+// waits until an owner approves it under People.
 const MAX_PENDING = 20;
 authRouter.post("/signup", async (req, res) => {
   const name = String(req.body?.name || "").trim();
@@ -36,16 +38,18 @@ authRouter.post("/signup", async (req, res) => {
   if (!validEmail(email)) return res.status(400).json({ error: "That doesn't look like an email address" });
   const problem = passwordProblem(password);
   if (problem) return res.status(400).json({ error: problem });
+  const auto = await autoApproveSignups();
   const pending = await q(`SELECT count(*)::int AS n FROM users WHERE pending_approval`);
-  if (pending.rows[0].n >= MAX_PENDING) {
+  if (!auto && pending.rows[0].n >= MAX_PENDING) {
     return res.status(429).json({ error: "Too many accounts are waiting for approval. Ask the farm owner." });
   }
   try {
-    await q(
+    const r = await q(
       `INSERT INTO users (email, password_hash, name, role, phone, active, pending_approval)
-       VALUES ($1, $2, $3, 'caretaker', $4, false, true)`,
-      [email, bcrypt.hashSync(password, 10), name, phone]);
-    res.status(201).json({ ok: true, pending_approval: true });
+       VALUES ($1, $2, $3, 'caretaker', $4, $5, $6) RETURNING id`,
+      [email, bcrypt.hashSync(password, 10), name, phone, auto, !auto]);
+    if (auto && phone) await syncWaContact(r.rows[0].id, phone);
+    res.status(201).json({ ok: true, pending_approval: !auto });
   } catch (err) {
     if (err.code === "23505") return res.status(409).json({ error: "An account with that email already exists. Try signing in." });
     throw err;

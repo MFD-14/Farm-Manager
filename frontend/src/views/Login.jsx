@@ -15,9 +15,11 @@ export default function Login({ onLogin, notice }) {
   const [phone, setPhone] = useState("");
 
   async function signUp() {
-    await apiJson("/api/auth/signup", {
+    const r = await apiJson("/api/auth/signup", {
       method: "POST", body: { name: name.trim(), email: email.trim(), password, phone: phone.trim() },
     });
+    // Sign-ups are let straight in unless the owner has switched that off.
+    if (r.pending_approval === false) return onLogin(email.trim(), password);
     setMode("requested");
     setPassword(""); setConfirm("");
   }
