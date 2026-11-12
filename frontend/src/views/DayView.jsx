@@ -10,6 +10,7 @@ import CaptureSheet from "../components/CaptureSheet.jsx";
 import RecordForm, { AddSheet } from "../components/RecordForm.jsx";
 import { RECORD_TYPES } from "../lib/records.js";
 import SheetClose from "../components/SheetClose.jsx";
+import WeatherCard from "../components/WeatherCard.jsx";
 
 const PRIORITY_ORDER = { P0: 0, P1: 1, P2: 2, P3: 3 };
 const OPEN_STATES = new Set(["released", "acknowledged", "in_progress"]);
@@ -90,6 +91,7 @@ export default function DayView({ onCountsChanged, codes, title, onAddNote, canA
     <div className="wrap">
       <div className="daytitle">{title || today}</div>
       {children}
+      {!codes && <WeatherCard />}
       {windows.map((w, i) => (
         <div className="withhold-banner" key={i}>
           <b>{w.type === "phi" ? "Pre-harvest interval" : "Withdrawal"} active</b> · {w.subject_name}

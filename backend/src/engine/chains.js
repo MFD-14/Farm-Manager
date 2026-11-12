@@ -90,22 +90,3 @@ export async function instantiateChainsForAnchor(c, anchorEvent, instance, event
   }
   return created;
 }
-
-// If the anchor moves (replant): unreleased chain members shift; released ones
-// are superseded (spec 3.3). Re-instantiating with the new anchor date creates
-// the shifted set; this marks the old scheduled members superseded.
-export async function supersedeChainMembers(c, subjectId, anchorEvent) {
-  const { rows } = await c.query(
-    `SELECT id FROM task_instances
-     WHERE subject_id = $1 AND params->>'anchor' = $2 AND state IN ('scheduled','released','acknowledged')`,
-    [subjectId, anchorEvent]);
-  const { foldEvent } = await import("./fold.js");
-  const { randomUUID } = await import("node:crypto");
-  for (const r of rows) {
-    await foldEvent(c, {
-      event_uuid: randomUUID(), instance_id: r.id, actor_type: "system",
-      type: "superseded", payload: { reason: "anchor moved" },
-    });
-  }
-  return rows.length;
-}

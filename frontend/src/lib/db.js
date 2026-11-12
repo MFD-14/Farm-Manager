@@ -24,21 +24,21 @@ export const dbPromise = openDB("woodlands", 2, {
   },
 });
 
-export async function putPlanInstances(instances) {
+// Replace the cached plan with the server's. Tasks with changes still waiting
+// to sync keep their local copy, so nothing reported offline is lost or reset.
+export async function replacePlan(instances) {
   const db = await dbPromise;
+  const unsynced = new Set((await db.getAll("outbox_events")).map((e) => e.instance_id).filter(Boolean));
   const tx = db.transaction("plan", "readwrite");
-  for (const inst of instances) await tx.store.put(inst);
+  const fresh = new Set(instances.map((i) => i.id));
+  for (const id of await tx.store.getAllKeys()) if (!fresh.has(id) && !unsynced.has(id)) await tx.store.delete(id);
+  for (const inst of instances) if (!unsynced.has(inst.id)) await tx.store.put(inst);
   await tx.done;
 }
 
 export async function getPlanInstances() {
   const db = await dbPromise;
   return db.getAll("plan");
-}
-
-export async function clearPlan() {
-  const db = await dbPromise;
-  await db.clear("plan");
 }
 
 export async function patchInstance(id, patch) {

@@ -53,6 +53,3 @@ export function applyTransition(instance, eventType) {
 export function isTerminal(state) {
   return TERMINAL_STATES.has(state);
 }
-
-// Terminal-positive states for KPI purposes (spec 9.2): verified_closed and approved skips.
-export const TERMINAL_POSITIVE = new Set(["verified_closed", "skipped"]);

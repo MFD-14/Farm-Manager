@@ -85,13 +85,6 @@ export async function apiJson(path, opts) {
   return resp.json();
 }
 
-// Evidence photos need the bearer token, which an <img src> cannot send, so
-// fetch them as blobs and hand back an object URL.
-export async function mediaObjectUrl(mediaUuid) {
-  const resp = await api(`/api/media/${mediaUuid}`);
-  return URL.createObjectURL(await resp.blob());
-}
-
 // Evidence bytes, for keeping on the phone (offline review).
 export async function mediaBlob(mediaUuid) {
   const resp = await api(`/api/media/${mediaUuid}`);

@@ -160,6 +160,8 @@ syncRouter.get("/bundle", auth(), async (req, res) => {
     reference_delta: reference,
     active_windows: withSubjects,
     last_values: Object.fromEntries(lastValues.rows.map((r) => [r.template_code, { fields: r.fields, at: r.closed_at }])),
+    // Forecast, hours and spraying windows, so the weather card works offline.
+    weather: (await q(`SELECT value FROM farm_settings WHERE key = 'forecast'`)).rows[0]?.value || null,
     cursor: new Date().toISOString(),
   });
 });

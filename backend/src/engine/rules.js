@@ -5,7 +5,7 @@ import { config } from "../config.js";
 import { foldEvent } from "./fold.js";
 import { waterBalance } from "./physics.js";
 import { notify } from "../workers/notifier.js";
-import { farmDateStr, addDays, farmTime } from "../util/time.js";
+import { farmDateStr, addDays } from "../util/time.js";
 
 // Release a template now (triggers, plans, owner-released project steps). A
 // periodKey makes the release idempotent: a plan step is never released twice.
@@ -77,7 +77,6 @@ const CONDITIONS = {
     // Forecast covers the window the gauge cannot: tomorrow. Acting ahead of
     // confident heavy rain saves the water before it falls.
     const { forecastFor } = await import("../workers/forecast.js");
-    const { farmDateStr, addDays } = await import("../util/time.js");
     const tomorrow = await forecastFor(c, addDays(farmDateStr(), 1));
     const minProb = cond.forecast_min_prob ?? 60;
     if (tomorrow && tomorrow.rain_mm >= cond.value && tomorrow.prob_pct >= minProb) {

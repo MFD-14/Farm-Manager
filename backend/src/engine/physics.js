@@ -64,24 +64,3 @@ export async function timingSanity(c, instance, event) {
   }
   return null;
 }
-
-// Feed balance: weekly P-07 stock count vs cumulative P-01 consumption within 10%.
-export async function feedBalance(c) {
-  const { rows: counts } = await c.query(
-    `SELECT value, taken_at FROM readings WHERE metric = 'feed_stock_bags' ORDER BY taken_at DESC LIMIT 2`);
-  if (counts.length < 2) return null;
-  const [latest, previous] = counts;
-  const { rows } = await c.query(
-    `SELECT COALESCE(SUM(value),0) AS s FROM readings
-     WHERE metric = 'poultry_feed_kg' AND taken_at BETWEEN $1 AND $2`,
-    [previous.taken_at, latest.taken_at]);
-  const consumedKg = Number(rows[0].s);
-  const BAG_KG = 50;
-  const stockDropKg = (Number(previous.value) - Number(latest.value)) * BAG_KG;
-  if (consumedKg === 0 && stockDropKg === 0) return null;
-  const drift = Math.abs(stockDropKg - consumedKg) / Math.max(consumedKg, 1);
-  if (drift > 0.1) {
-    return { kind: "feed_drift", stockDropKg, consumedKg, drift: Math.round(drift * 100) / 100 };
-  }
-  return null;
-}

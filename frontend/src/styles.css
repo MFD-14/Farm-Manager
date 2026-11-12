@@ -59,7 +59,6 @@ button { font-family:var(--fb); cursor:pointer; }
 .card[data-priority="P1"]::before { background:var(--gold); }
 .card[data-priority="P2"]::before { background:var(--g4); }
 .card[data-priority="P3"]::before { background:var(--bd); }
-.card:active { transform:scale(.985); box-shadow:none; }
 .card.done { opacity:.55; }
 .card.done::before { background:var(--bl); }
 .card .row { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
@@ -411,8 +410,6 @@ button { font-family:var(--fb); cursor:pointer; }
 .act-status.warn { background:#fef3c7; color:#92400e; }
 .act-status.muted { background:var(--bl); color:var(--tm); }
 .verdict { padding:6px 0 10px; border-bottom:1px solid var(--bl); }
-.verdict-reason { font-size:13.5px; color:var(--tx); margin:4px 0 2px; line-height:1.45; }
-.verdict-meta { font-size:12.5px; color:var(--tm); margin-top:2px; }
 
 /* ── Attachments ─────────────────────────────────────────── */
 .attach-btns { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
@@ -480,8 +477,13 @@ button { font-family:var(--fb); cursor:pointer; }
 .note-input { width:100%; border:1px solid var(--bd); border-radius:10px; padding:10px 12px; font:inherit;
   font-size:15px; margin-bottom:8px; background:var(--bg); }
 .help-list { padding-left:18px; } .help-list li { margin-bottom:6px; }
-.card.weather { background:var(--b1); display:flex; flex-direction:column; gap:2px; }
-.card.weather b { font-size:22px; font-family:var(--fd); }
+.card.weather { background:var(--b1); display:flex; flex-direction:column; gap:6px; }
+.wx-top { display:flex; align-items:center; gap:12px; color:#1b5e8a; }
+.wx-top b { display:block; font-size:22px; font-family:var(--fd); color:var(--tx); }
+.wx-top span, .wx-line { font-size:13.5px; color:var(--ts); }
+.wx-line b { color:var(--tx); }
+.wx-line.stale { color:var(--tm); font-size:12.5px; }
+.wx-alert { font-size:13.5px; font-weight:600; color:var(--r5); }
 .week-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
 .field-map { width:100%; border-radius:14px; margin-bottom:10px; box-shadow:var(--ss); background:var(--e8); isolation:isolate; }
 .warn-text { color:var(--r5); }

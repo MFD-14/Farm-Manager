@@ -5,6 +5,7 @@ import { apiJson, mediaBlob } from "../lib/api.js";
 import { queueDecision, pendingDecisions, cachedMediaBlob, cacheMediaBlob, metaGet, metaSet } from "../lib/db.js";
 import { drainOnce } from "../lib/sync.js";
 import SheetClose from "../components/SheetClose.jsx";
+import WeatherCard from "../components/WeatherCard.jsx";
 
 // Evidence from the server, kept on the phone after the first look so the
 // queue can be reviewed with no signal.
@@ -95,12 +96,7 @@ function Digest() {
     <div className="wrap">
       <div className="daytitle">Dashboard</div>
       <p className="farm-sub">Week to date as of {new Date(`${digest.date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
-      {digest.weather && (
-        <div className="card weather">
-          <b>{Math.round(digest.weather.tmax)}° / {Math.round(digest.weather.tmin)}°C</b>
-          <span>{digest.weather.rain_mm > 0 ? `${digest.weather.rain_mm} mm rain (${digest.weather.prob_pct}%)` : "No rain expected"} · Kwekwe</span>
-        </div>
-      )}
+      <WeatherCard />
       <div className="week-grid">
         {[["Revenue", w.revenue_usd, (v) => `$${Math.round(v).toLocaleString()}`, w.daily?.revenue_usd], ["Bundles harvested", w.bundles_harvested, undefined, w.daily?.bundles_harvested],
           ["New plantings", w.plantings], ["Labour hours", w.labour_hours]].map(([label, p, f = (v) => v, series]) => (

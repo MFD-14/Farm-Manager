@@ -13,7 +13,7 @@
 //
 // The ledger is a deterministic fold over readings — recomputed from a window,
 // never stored, in keeping with the system's projection discipline.
-import { addDays, farmDateStr, farmTime } from "../util/time.js";
+import { addDays } from "../util/time.js";
 import { rainForDay } from "./rainfall.js";
 
 // Kwekwe long-term monthly reference ET0 (mm/day), used only when neither a

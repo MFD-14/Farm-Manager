@@ -4,7 +4,7 @@ import { test, before, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
 import { prepareDb, resetDynamic, tx, q } from "./helpers.js";
 import { createApp } from "../src/app.js";
-import { fetchForecast } from "../src/workers/forecast.js";
+import { fetchForecast, sprayWindows, deltaT } from "../src/workers/forecast.js";
 import { fetchNasaPower, dailyRain, rainForDay, storeEstimates, SOURCES } from "../src/engine/rainfall.js";
 import { evaluateRules } from "../src/engine/rules.js";
 import { runRelease } from "../src/engine/release.js";
@@ -107,4 +107,33 @@ test("rain page totals include estimated days and mark them", async () => {
     assert.equal(body.season.estimated_days, 1);
     assert.equal(cur.total_mm, 12);
   }
+});
+
+test("spraying windows: light breeze, Delta T 2 to 8, and dry for three hours after", () => {
+  assert.equal(deltaT(20, 50), 6.3);
+  const hr = (h, o = {}) => ({ time: `2026-11-12T${String(h).padStart(2, "0")}:00`, wind_kmh: 8, delta_t: 5, rain_mm: 0, prob_pct: 10, ...o });
+  const hours = [hr(5, { wind_kmh: 1 }), hr(6), hr(7), hr(8), hr(9, { wind_kmh: 22 }), hr(10, { delta_t: 11 }),
+    hr(11), hr(12), hr(13), hr(14), hr(15, { rain_mm: 3, prob_pct: 80 }), hr(16), hr(17), hr(18)];
+  // 05 too still, 09 too windy, 10 too dry; 12 to 15 rain inside the drying time.
+  assert.deepEqual(sprayWindows(hours), [
+    { date: "2026-11-12", from: 6, to: 9 }, { date: "2026-11-12", from: 11, to: 12 }, { date: "2026-11-12", from: 16, to: 19 }]);
+});
+
+test("the forecast carries wind, hours and spraying windows, and reaches the phone in the day bundle", async () => {
+  const days = [0, 1].map((n) => addDays(TODAY, n));
+  const time = days.flatMap((d) => Array.from({ length: 24 }, (_, h) => `${d}T${String(h).padStart(2, "0")}:00`));
+  const all = (v) => time.map(() => v);
+  fakeWeather({
+    daily: { time: days, precipitation_sum: [0, 2], precipitation_probability_max: [5, 30], temperature_2m_max: [31, 29],
+      temperature_2m_min: [17, 16], et0_fao_evapotranspiration: [5, 4.5], weather_code: [1, 61], wind_speed_10m_max: [14, 20], wind_gusts_10m_max: [30, 41] },
+    hourly: { time, temperature_2m: all(24), relative_humidity_2m: all(55), precipitation_probability: all(5), precipitation: all(0), wind_speed_10m: all(9) },
+  });
+  assert.equal((await tx((c) => fetchForecast(c))).ok, true);
+  assert.match(urls[0], /hourly=temperature_2m,relative_humidity_2m.*wind_speed_10m/);
+  globalThis.fetch = realFetch;
+  const bundle = await (await realFetch(`${base}/api/sync/bundle`, { headers: { Authorization: `Bearer ${ownerToken}` } })).json();
+  const w = bundle.weather;
+  assert.deepEqual([w.daily[0].code, w.daily[0].wind_kmh, w.daily[0].gust_kmh], [1, 14, 30]);
+  assert.equal(w.hours.length, 28, "05:00 to 18:00 for today and tomorrow");
+  assert.deepEqual(w.spray, days.map((date) => ({ date, from: 5, to: 19 })));
 });

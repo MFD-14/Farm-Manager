@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import { calendarOccurrences, meterDue, irrigationPlan } from "./schedules.js";
 import { evaluateGuards } from "./guards.js";
 import { e0AuditUpgrade } from "./evidence.js";
-import { farmTime, addDays } from "../util/time.js";
+import { farmTime } from "../util/time.js";
 import { foldEvent } from "./fold.js";
 
 const PRIORITY_ORDER = { P0: 0, P1: 1, P2: 2, P3: 3 };
@@ -258,23 +258,4 @@ export async function runRelease(c, dateStr, { now = new Date() } = {}) {
     [dateStr, orderedIds, capacityNote]);
 
   return { planIds: orderedIds, capacityNote };
-}
-
-// P2/P3 deferral when the day is over capacity (spec 3.6): defer up to 2/7 days.
-export async function deferOverflow(c, dateStr) {
-  const { rows } = await c.query(
-    `SELECT id, priority, deferral_count FROM task_instances
-     WHERE state IN ('released','acknowledged') AND priority IN ('P2','P3')
-       AND due_at::date = $1 AND deferral_count < CASE priority WHEN 'P2' THEN 2 ELSE 7 END`,
-    [dateStr]);
-  for (const r of rows) {
-    const next = addDays(dateStr, 1);
-    await foldEvent(c, {
-      event_uuid: randomUUID(), instance_id: r.id, actor_type: "system",
-      type: "deferred", payload: { to: next },
-    });
-    await c.query(`UPDATE task_instances SET due_at = $2, grace_until = $3 WHERE id = $1`,
-      [r.id, farmTime(next, "17:00"), farmTime(next, "20:00")]);
-  }
-  return rows.length;
 }

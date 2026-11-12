@@ -1,6 +1,6 @@
 // Schedule rule evaluation (spec 3.3). Given a template and a farm date, decide
 // which occurrences release today and at what times.
-import { DOW, farmMonth, daysBetween } from "../util/time.js";
+import { DOW, daysBetween } from "../util/time.js";
 
 function lastSaturday(dateStr) {
   const [y, m] = dateStr.split("-").map(Number);

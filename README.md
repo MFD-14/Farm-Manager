@@ -76,9 +76,15 @@ new field videos and posts advisory annotations that appear on the review card
 and never close a task.
 
 **Forecast feed.** Open-Meteo (no API key, free for non-commercial use, ~10k
-requests/day) is fetched daily at 04:15 farm time: 7-day precipitation, rain
-probability, temperatures and FAO-56 reference evapotranspiration for the farm
-coordinates. Trigger T2 acts ahead of confident heavy rain (>= 15 mm at >= 60%
+requests/day) is fetched every three hours (including 04:15 farm time, before
+release): 7-day precipitation, rain probability, temperatures, wind, sky
+condition and FAO-56 reference evapotranspiration for the farm's point, plus
+the working hours of today and tomorrow. From the hours the server works out
+spraying windows (wind 3 to 15 km/h, Delta T 2 to 8, dry for three hours
+after). The snapshot travels in the day bundle, so every phone shows a weather
+card offline and warns on spray tasks. The same request's past week, and NASA
+POWER for older days, fill rainfall on days the gauge wasn't read (marked as
+estimates; T2 stays gauge-only). Trigger T2 acts ahead of confident heavy rain (>= 15 mm at >= 60%
 probability tomorrow) while an observed gauge reading always wins over the
 forecast; a stale snapshot (> 36 h) is ignored and the gauge path never depends
 on the network. The rain page shows the 7-day strip with T2 flags and the

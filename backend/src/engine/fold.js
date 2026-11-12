@@ -8,7 +8,7 @@ import { applyTransition, isTerminal } from "./stateMachine.js";
 import { validateEvidence } from "./evidence.js";
 import { routeAfterDoneReported } from "./verification.js";
 import { instantiateChainsForAnchor } from "./chains.js";
-import { farmDateStr } from "../util/time.js";
+import { farmDateStr, farmDateParts } from "../util/time.js";
 
 // Derived reading expressions used by the seed taxonomy.
 function deriveValue(expr, fields) {
@@ -167,8 +167,11 @@ export async function foldEvent(c, event, { skipSideEffects = false, replay = fa
       && !event.payload?.weather_at_application) {
     const fc = await c.query(`SELECT value FROM farm_settings WHERE key = 'forecast'`);
     // Farm-local date: the forecast is keyed by farm days, not UTC days.
-    const dateStr = farmDateStr(event.device_time ? new Date(event.device_time) : new Date());
+    const at = event.device_time ? new Date(event.device_time) : new Date();
+    const dateStr = farmDateStr(at);
     const day = fc.rows[0]?.value?.daily?.find((x) => x.date === dateStr);
+    // The forecast hour the spray went on: wind and Delta T are what decide drift.
+    const hour = fc.rows[0]?.value?.hours?.find((x) => x.time === `${dateStr}T${String(farmDateParts(at).hh).padStart(2, "0")}:00`);
     const rain = await c.query(
       `SELECT COALESCE(SUM(value),0) AS s FROM readings
        WHERE metric = 'rain_mm' AND taken_at >= now() - interval '24 hours'`);
@@ -179,6 +182,7 @@ export async function foldEvent(c, event, { skipSideEffects = false, replay = fa
         weather_at_application: {
           tmax: day?.tmax ?? null, tmin: day?.tmin ?? null,
           rain_forecast_mm: day?.rain_mm ?? null, rain_prob_pct: day?.prob_pct ?? null,
+          wind_kmh: hour?.wind_kmh ?? null, temp: hour?.temp ?? null, delta_t: hour?.delta_t ?? null,
           rain_observed_24h_mm: Number(rain.rows[0].s),
           stamped_at: new Date().toISOString(),
         },

@@ -40,7 +40,3 @@ export function daysBetween(a, b) {
 }
 
 export const DOW = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
-
-export function farmMonth(d = new Date()) {
-  return farmDateParts(d).m;
-}

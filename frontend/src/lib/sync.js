@@ -2,9 +2,10 @@
 // FIFO with retry and backoff; media resumable in offset chunks. The drain runs
 // on connectivity events, on an interval, and after every capture.
 import { api, apiJson } from "./api.js";
+import { farmNow } from "./weather.js";
 import {
   pendingEvents, removeEvents, pendingMedia, updateMedia, removeMedia,
-  putPlanInstances, metaGet, metaSet, pendingDecisions, removeDecision,
+  replacePlan, metaGet, metaSet, pendingDecisions, removeDecision,
 } from "./db.js";
 
 let draining = false;
@@ -47,7 +48,14 @@ export async function drainOnce() {
     // 2. Decisions made offline by an owner or task manager.
     await drainDecisions();
 
-    // 3. Media queue: resumable chunks, P0/P1 jump the queue (spec 5.3). Each
+    // 3. A fresh day bundle when the farm day has changed or the cached one is
+    // over half an hour old: the new day's tasks, tasks added since, weather.
+    const bundleAt = await metaGet("bundle_at");
+    if ((await metaGet("token")) && ((await metaGet("bundle_date")) !== farmNow().date || !bundleAt || Date.now() - bundleAt > 30 * 60_000)) {
+      await pullBundle().catch(() => {});
+    }
+
+    // 4. Media queue: resumable chunks, P0/P1 jump the queue (spec 5.3). Each
     // file succeeds or fails on its own, with its error kept for the uploads
     // screen; videos can be held for Wi-Fi.
     const media = await pendingMedia();
@@ -165,11 +173,13 @@ export async function pullBundle() {
   // De-dup by id, plan order first.
   const seen = new Set();
   const merged = instances.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
-  await putPlanInstances(merged);
+  await replacePlan(merged);
   await metaSet("reference", bundle.reference_delta);
   await metaSet("bundle_date", bundle.date);
+  await metaSet("bundle_at", Date.now());
   await metaSet("active_windows", bundle.active_windows || []);
   await metaSet("last_values", bundle.last_values || {});
+  await metaSet("weather", bundle.weather || null);
   return merged;
 }
 

@@ -57,6 +57,7 @@ export default function AboutSheet({ onClose, user }) {
         <p className="about-text small">
           Weather forecasts by <a href="https://open-meteo.com/" target="_blank" rel="noreferrer">Open-Meteo.com</a>,
           licensed under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>.
+          Older rainfall estimates from the <a href="https://power.larc.nasa.gov/" target="_blank" rel="noreferrer">NASA POWER</a> project.
           Typefaces DM Sans and Fraunces under the SIL Open Font License.
         </p>
 

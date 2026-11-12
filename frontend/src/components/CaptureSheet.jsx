@@ -7,6 +7,7 @@ import { reportDone, requestSkip, flagProblem, evidenceReady, attachToTask, SKIP
 import Attachments from "./Attachments.jsx";
 import SheetClose from "./SheetClose.jsx";
 import { metaGet } from "../lib/db.js";
+import { today, sprayProblem, windowText } from "../lib/weather.js";
 
 export default function CaptureSheet({ instance, onClose, showCodes }) {
   const policy = useMemo(
@@ -20,6 +21,7 @@ export default function CaptureSheet({ instance, onClose, showCodes }) {
   const [busy, setBusy] = useState(false);
   const [lastValues, setLastValues] = useState(null);
   const [rainAhead, setRainAhead] = useState(null);
+  const [sprayNote, setSprayNote] = useState(null);
 
   const isSpray = policy.vim_profile === "spray_scene" || policy.inventory_out;
 
@@ -28,11 +30,14 @@ export default function CaptureSheet({ instance, onClose, showCodes }) {
       // AgriWebb pattern: show the previous entry beside each field.
       const lv = (await metaGet("last_values")) || {};
       setLastValues(lv[instance.template_code] || null);
-      // Agworld pattern: warn before spraying into forecast rain.
+      // Agworld pattern: warn before spraying in the wrong conditions (wind,
+      // heat, rain before it dries) or into forecast rain.
       if (isSpray) {
-        const rc = await metaGet("rain_cache");
-        const next24 = rc?.forecast?.daily?.slice(0, 2) || [];
-        const wet = next24.find((d) => d.rain_mm >= 5 && d.prob_pct >= 50);
+        const w = await metaGet("weather");
+        const t = today(w);
+        const problem = t && sprayProblem(t.at, t.hours);
+        if (problem) setSprayNote(`Not a good time to spray: ${problem}.${t.windows.length ? ` Better ${t.windows.map(windowText).join(" or ")}.` : ""}`);
+        const wet = (w?.daily || []).slice(0, 2).find((d) => d.rain_mm >= 5 && d.prob_pct >= 50);
         if (wet) setRainAhead(wet);
       }
     })();
@@ -117,6 +122,7 @@ export default function CaptureSheet({ instance, onClose, showCodes }) {
           </div>
         )}
 
+        {sprayNote && isOpen && <div className="retake">{sprayNote}</div>}
         {rainAhead && isOpen && (
           <div className="retake">
             Rain forecast ({rainAhead.rain_mm} mm, {rainAhead.prob_pct}%) within 24–48 h —

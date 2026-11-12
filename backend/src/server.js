@@ -21,13 +21,15 @@ async function main() {
   const app = createApp();
   app.listen(config.port, () => console.log(`wfm-backend listening on :${config.port}`));
 
-  // 04:15 farm time: pull the forecast so T2 can evaluate it before release;
-  // also fetch once at boot. Failures are silent — the gauge path never depends
-  // on the network. NASA POWER rainfall estimates refresh on the same schedule.
+  // Forecast every three hours, including 04:15 farm time so T2 can evaluate
+  // it before release, and once at boot. Failures are silent: the gauge path
+  // never depends on the network. NASA POWER rainfall estimates refresh daily.
   tx((c) => fetchForecast(c)).catch(() => {});
   tx((c) => fetchNasaPower(c)).catch(() => {});
-  cron.schedule("15 4 * * *", async () => {
+  cron.schedule("15 1-22/3 * * *", async () => { // 01:15, 04:15 ... 22:15
     try { await tx((c) => fetchForecast(c)); } catch { /* keep last snapshot */ }
+  }, TZ);
+  cron.schedule("20 4 * * *", async () => {
     try { await tx((c) => fetchNasaPower(c)); } catch { /* keep last estimates */ }
   }, TZ);
 
